@@ -1,0 +1,133 @@
+---
+title: <em>On</em> Good Software
+date: 2015/06/21
+author: Alexey Radul
+---
+
+Good software is software that admits a simple mental model.
+
+For all that I have observed and participated in plenty of discussions
+about one or another piece of software as to whether it is or is not
+good, I am surprised to say that I have never seen READMORE a single defining
+principle clearly articulated.  Permit me, therefore, to propose this
+one:
+
+> Good software is software that admits a simple mental model.
+
+Or, more precisely, software is better inasmuch as the
+simplicity-accuracy curve for models of it is more favorable.
+
+Let us consider some generally avowed qualities of good software and
+see how they relate to mental models.
+
+- "Good software works."  One can view this desideratum as separate
+  from any talk about mental models, and I would not argue very hard
+  with such a one.  But one can also view this desideratum as saying
+  that good software is appropriate to model as
+  "something that performs the task"---which is generally simpler
+  than a detailed understanding of how that task is performed.
+
+- "Good software is robust [to unusual conditions]."  This desideratum
+  is about not needing to decorate one's mental model of good software
+  with various "if"s, "and"s, or "but"s about situations where it
+  behaves strangely.
+
+- "Good software is maintainable."  What is software maintenance?
+  Adjusting it in light of new desiderata or clarified understanding
+  of existing desiderata.  For this to be easy, the developer doing it
+  must have an accurate mental model of the software being maintained,
+  and of what will happen under various possible changes.
+
+- "Good software is reusable."  That is, the people in a position to
+  reuse it have clear enough and good enough mental models of the
+  software to reuse it.  Reusability also has to do with generality,
+  which is also the same sort of thing: General things are simple
+  things, because complexity only arises when dealing with specifics.
+
+- "Good software is extensible."  This one is about decomposing the
+  mental model of the task into additive capabilities, and making the
+  structure of the software follow that decomposition in such a way
+  that additional capabilities correspond directly to additional
+  components.  And such that those components have simple yet adequate
+  interfaces to the rest of the system.
+
+- "Good software is debuggable."  Meaning that it produces sufficient
+  information (e.g., logs) about how it operates that a developer can
+  quickly isolate and repair any problem that arises.  This is also
+  about mental models: good software should provide the information needed to
+  amplify the baseline mental model the developer has into a
+  complete explanation of the (presumably undesirable) phenomenon they
+  are trying to investigate at any particular point.
+
+- "Good software is secure."  This desideratum can also be viewed as
+  being about matching mental models: pretty much all security
+  violations are abuses that a developer or user implicitly assumes
+  are not possible.  The thing an exploit exploits is a discrepancy
+  between how a given piece (or collection) of software actually
+  operates and the meanings and implicit rules its legitimate users
+  ascribe to it.
+
+- "Good software is modular."  That is, it is broken down into parts
+  in such a way that it can profitably be modeled by modeling those
+  parts individually and observing that their composition is fairly
+  simple.
+
+- "Good software is testable."  That is, it should be easy to compare
+  one's mental model of the software (or some part of it) against the
+  reality.
+
+- "Good software is efficient."  In one sense, calling this one as
+  being about mental models is a bit of a stretch; but in another,
+  it's also about expectation matching: the software does not take
+  appreciably more resources to perform its task than one would
+  assume.
+
+- "Good software is scalable."  That is, it's easy and favorable
+  enough to get it to do more work by throwing more hardware at it.
+  This is also about mental models: good software does not impede the
+  performance of its task in a larger computational environment; or,
+  alternately, is able to take advantage of the computational
+  resources one would think it should.
+
+- "Good software is learnable."  That is, the simplicity/accuracy
+  curve of mental models of the software is not too difficult to
+  traverse towards greater accuracy.
+
+- "Good software has few bugs."  What is a bug?  It is a discrepancy
+  between a mental model and the object being modeled.  Usually bugs
+  arise because the model of composing some parts is "they work
+  together smoothly" even when they do not; or, viewed another way,
+  because the model of the rest of the world from the point of view of
+  one component is not properly met by another.
+
+- "Good software is compatible [with the surrounding ecosystem]."
+  This is again about the accuracy of an implicit mental model, namely
+  that starting to use a piece of software will smoothly add a
+  capability to one's workflow/life, and interoperate flawlessly
+  with everything else one is already using.  If only users would
+  appreciate how much work this is!
+
+Which brings me to a critical corollary of my proposed principle:
+since simplicity is relative (to what one has already learned and
+internalized), the quality of software is also relative.  In my own
+experience, examples abound: I happen not to think an application is
+any good unless it runs on GNU/Linux, though the majority seems to
+disagree; many programmers dismiss languages from the Lisp family as
+complex, because they learned infix rather than prefix notation in
+school; I think Emacs is a great text editor, but maybe that's just
+because my fingers don't know any other sets of keybindings.
+
+> Software is good in your eyes if you can easily form a good mental
+> model of it.
+
+Notes
+-----
+
+Perhaps the relativity of the goodness of software is at the root of
+the classic distinction between the software design styles that have
+been <a href="https://www.dreamsongs.com/RiseOfWorseIsBetter.html">named</a>
+the New Jersey and MIT schools.  Where the latter strives for
+software that is well modeled directly, regardless of the underlying
+platform, the former strives for software that is well modeled as a
+simple implementation on top of an underlying platform that is
+assumed to be worth understanding regardless.

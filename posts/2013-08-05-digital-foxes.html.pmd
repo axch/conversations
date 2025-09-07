@@ -1,0 +1,306 @@
+---
+title: Digital Foxes
+date: 2013/08/05
+author: Alexey Radul
+epigraph: The fox knows many things; the hedgehog knows one big thing.
+---
+The successful fox must know more than the sum of what the
+hedgehogs know, for it must know the connections from one thing to
+another.  This fact is key to the design of computer systems for
+solving certain kinds of problems.READMORE
+
+I keep coming across domains with the following structure:
+
+1. One wishes to solve a large, complex problem that fits into
+   some uniform formalism (for example, a detailed simulation of a car
+   as a system of 10,000 ODEs).
+
+2. The formalism has a variety of methods developed for solving
+   problems stated in that formalism (e.g., various kinds of
+   integrators).  These methods are hedgehogs in that they treat the
+   entire problem uniformly, possibly with state that's global to the
+   whole solution (e.g., the step size).
+
+3. The problem, being large, has many different parts, with different
+   solution characteristics (e.g., some variables change slowly and
+   smoothly, others oscillate rapidly).
+
+4. The performance of each hedgehog method on the whole problem is
+   determined by its performance on the worst part of the problem
+   (e.g., the step size has to be small enough to trace the
+   highest-frequency oscillation in the model).
+
+5. Different methods (and different settings of the global state) have
+   different weaknesses (e.g., high-order integrators are good for very
+   smooth systems, because they can achieve large step sizes).
+
+It is therefore desirable to solve such large problems like a fox: partition
+the large problem into smaller subproblems, that are more uniform in
+their solution characteristics, and solve each part with the most
+appropriate method.
+
+On the one hand, such foxy partitioning is eased because these
+problems tend to be sparse, and have natural cliques, where variables
+within a clique interact with each other much more strongly and
+densely than with variables in a different clique.
+
+On the other hand, partition is difficult, because the parts do
+interact, so the solution methods need to communicate partial or
+approximate solutions to each other during the solving process.
+Cross-method communication is especially difficult because each method
+is developed with its own invariants about what it communicates to
+itself during its progress and how, and, being a hedgehog, does not
+understand the communications of other hedgehog methods.  Translation
+is therefore necessary.
+
+This pattern seems to appear quite often at the cutting edge of
+computational science.  Some formalisms where this phenomenon is
+encountered, with example problems:
+
+- Systems of ordinary differential equations or differential algebraic
+  equations (the car example, with parts of greatly differing
+  stiffness).
+
+- Coupled partial differential equations (e.g., detailed simulation of
+  water+temperature flow through a system of pipes, pools, and tanks:
+  those of the pipes that are narrow enough can be modeled with 1D
+  PDEs, those of the pools that are shallow enough can be modeled with
+  2D PDEs, and the tanks with 3D PDEs).
+
+- Model inference in machine learning (different model shapes, like
+  Gaussian mixtures and HMMs, can easily appear in the same compound
+  model).
+
+  - This is exacerbated by the rise of probabilistic programming
+    languages, which easily generate models with long chains of
+    deterministically-linked variables---the only place where
+    exhaustive search shines as an inference method.
+
+- Constraint satisfaction
+
+One common theoretical thread is that all these problem domains are at
+least NP-hard.  This means that such problems are unsolvable in the
+general case (unless P = NP), which is why every hedgehog has
+weaknesses.  Of course, this also means that any fox---any
+combination of methods, or any system for selecting methods---must
+also fail in some cases (unless P = NP).  However, many particular
+instances of interest are solvable; and the cutting edge occurs where
+they are solvable only by compound methods, not by uniform application
+of basic ones.
+
+It is therefore desirable to develop foxy computer systems: ones that
+allow easy (and, where possible, automatic) partitioning of a problem
+into appropriate parts, selection of methods for solving the parts,
+and composition thereof into a compound method for solving the whole
+problem.
+
+How _to_ Breed _a_ Digital Fox
+------------------------------
+
+How might such a digital fox be developed?  It seems to me that a
+system like this must have the following pieces:
+
+- Problem language: A language for specifying instances of the problem
+  class (e.g., the Modelica language for DAEs, various probabilistic
+  programming languages).
+
+  - This language must of necessity have means of abstraction, in
+    order for human authors of problem instances to be able to handle
+    the complexity of the problems they specify (e.g., one does not
+    write out 10,000 ODEs all in one big table).  Are these
+    abstraction boundaries always going to be the same as the
+    desirable partitions of the problem into parts?  If not, how should
+    the partitions be specified or hinted at?
+
+- Hedgehogs: A library of primitive solution methods (e.g., 4th order Runge-Kutta, Gibbs sampling).  I
+  do not know to what extent such libraries already exist as reusable
+  software in each domain.  However, the definition of "a method" is
+  that practitioners, after suitable study, know how to implement an
+  instance of that method specialized to any particular problem they
+  wish to solve with it.  The trick here is to extract that knowledge
+  into software definitions that specify enough of the method to
+  automatically construct efficient specializations, but not so much
+  as to over-restrict applicability.
+
+- Bridges: A library of bridges for communicating between solution methods.  In
+  my mind, this is the key missing piece in all proposed foxes I have
+  seen so far---more [below](#on-bridges).  In particular, I have seen no evidence
+  of the knowledge needed to make this library appearing in the
+  literature of any field, and I do not know for which domains this
+  knowledge exists even in the minds of practitioners.
+
+- Plan language: A language for specifying problem-specific compound methods.  A
+  specification of a problem-specific compound method is a
+  decomposition of the problem into parts, a specification of what
+  methods are to be used to solve each part, and a specification of
+  the bridges for communicating between them.  Compound methods can
+  have recursive structure in the sense that the method for solving a
+  part of the problem can itself be compound.  This part is a little
+  tricky too, because one wants to be flexible about dynamic problem
+  structure (e.g., Chinese Restaurant Process introducing more
+  variables at solution runtime, or conditional triggers in an ODE
+  simulation changing the applicable equations).
+
+- Plan executor: A mechanism for efficiently executing problem-specific compound
+  solution methods.  I presume this is going to be some combination of
+  query planner, compiler, and runtime system, possibly using
+  profiling information, etc.  The better this mechanism is, the
+  easier becomes the task of writing the libraries of primitive
+  methods and bridges (the more the system can figure out itself, the
+  less needs to be specified), and the less cumbersome becomes the
+  language of compound methods.
+
+- Planner: A subsystem for evaluating, searching, suggesting, or
+  inferring compound methods automatically based on the specification
+  of the problem.
+
+While it is important that these six pieces are different, and
+responsible for different jobs, I'm afraid that, with the notable
+exception of the planner, they must all be invented essentially
+together.  What the hedgehogs are is presumably known at the start,
+but how they should be specified or implemented depends critically on
+the executor and the bridges.  The bridges obviously depend critically
+on the hedgehogs they are bridging.  The design of the plan language
+depends upon the composition constraints imposed by the hedgehogs and
+the qualities of the bridges, as well as how much it needs to tell the
+executor.  The design of the plan language also back-influences the
+hedgehogs and bridges.  The problem language is intimately tied to the
+plan language because they both talk about different perspectives on
+the same thing.  And conversely, the executor depends upon what it
+will be executing.  And all five of these essential pieces are
+complicated, so should be designed iteratively.  This is exactly the
+kind of tight ball of design dependencies that should be neither
+rushed nor partitioned across organizations, but should rest with a
+close-knit team that has enough time to iterate on all the pieces
+together until a good solution emerges.
+
+You will note that I omitted the planner from the previous admonition.
+I view the planner as optional because a digital fox without a planner would
+already be very useful: rather than programming solutions to their
+problems in C++, practitioners could program them in the plan
+language; even without any further assistance, I expect the gains in
+productivity to be tremendous.
+ 
+In fact, I think the automatic method invention problem is something
+of a red herring.  It is attractive to people who propose to build
+foxes because it looks like the kind of problem the fox is meant to
+solve, so they are tempted to apply their favorite methods from the
+discipline to try solving it.  However, the method invention problem
+is guaranteed to be intractable in general (unless P = NP) because the
+underlying problems are intractable in general.  What's worse, the
+hope of automating this step can lead to an obscure and hard-to-use
+design for the plan language; which will turn the overall system into
+a usability nightmare in the cases where the planner invents a bad
+plan.  I am therefore of the opinion that effort is better directed
+at getting the other parts right; and a clear design for the rest
+would enable a planner to be retrofit over the working fox later,
+after the nature of the method invention problem in this domain is
+better understood.  Yes, doing so will probably require modifying the
+executor to instrument execution and give feedback about the quality
+of the plan, but that does not seem too steep a price to pay for not
+having to think too hard about the planner when working out the other
+five parts.
+
+By the way, I see making a digital fox as a form of defeat.  In some sense,
+all the understanding of the domain is contained in the available
+hedgehogs; and combining them into a fox introduces enormous
+additional complexity for no "fundamental" gain in coverage.[^not-really]  This
+is not only complexity of the implementation, which is bad enough, but
+also complexity of the interface: a fox can fail in any of the ways
+its component methods can fail, and in additional ways introduced by
+method selection and method combination.  So it's much better to solve
+your problem with a better hedgehog if you can---making a fox is a
+last resort.  But new hedgehogs are hard to invent, and the time comes
+when a field gives up and starts thinking about foxes.  On the bright
+side, a high-quality fox should be able to capture new hedgehogs as
+they emerge from their dens.
+
+_On_ Bridges
+------------
+
+The thing that makes some procedure a (hedgehog) solution method is
+that it sets up and uses some invariants for representing partial or
+approximate solutions to the problem, and iteratively expands or
+improves them.  In general, for any two different hedgehogs, the
+invariants, and even the information communicated by them, will be
+different.  In order to stitch more than one method together, then, it
+will be necessary to adjust the information one method generates for
+use by the other; possibly both ways if the flow of information in the
+solution is bidirectional.
+
+This problem has an easy version and a hard version.  The easy version
+occurs when two methods really need the same information to flow
+across the link, and that information just happens to need some kind
+of format conversion because of accidents of internal representations
+in the software implementing the methods.  This version of the problem
+can probably be eliminated by implementing all the methods on a common
+substrate with common choices for representation of the same kinds of
+information.  The hard version is when the methods actually need
+different information: for instance, an inference method that deals in
+marginal distributions uses different information from one that deals
+in samples.  However, since both are ultimately about probability,
+there is hope that it may be possible to make an explicit bridge to
+translate, perhaps approximately, the information produced by one
+method into the information consumed by the other.
+
+I can envision two kinds of bridges: ones that operate across a link
+in the structure of information flow, communicating across the link to
+different methods; and ones that operate at a node, reconciling
+overlapping information of different kinds.  In the ODE domain, a
+link-type bridge would be a way to use an equation some of whose
+variables were being integrated exclusively by one integrator and some
+by another to exchange appropriate information between them.  A
+node-type bridge, in contrast, would occur if we allowed the sets of
+variables integrated by different methods to overlap, and would be a
+way to reconcile the different values produced by the different
+methods for the same variable, and communicate information between the
+integrators through the results of reconciliation.  I suppose hybrid
+bridges that incorporated aspects of the link-type and the node-type
+might also be possible.
+
+My understanding is that bridge-building is not currently well
+understood.  I hear rumors that people who carry out large simulations
+(ODEs, PDEs, etc) tend to implement such bridges, apparently in an
+ad-hoc way for each problem.  But at least the knowledge is there of
+how to do it in principle.  I don't know whether such knowledge even
+exists for machine learning problems---has anyone successfully
+attacked a compound ML model using, say, MCMC to infer one part and a
+variational method to infer another?
+
+_Extant_ Foxes
+--------------
+
+When I started writing this essay, I didn't think I knew of any
+digital foxes, but in retrospect the good old relational database
+management system fits the bill: SQL, together with the data schema,
+indexes, and table statistics, form the problem language; there are
+many different kinds of table scans, index searches, and result data
+structures available for performing parts of a query; the query plan
+language (which you can read with the SQL EXPLAIN statement) specifies
+problem-specific compound methods; and the query planner is the
+optional part that automatically searches plan space for good
+candidates.
+
+The operating system kernel seems to stretch the analogy a little, but
+it does have the essential feature of managing multiple different
+hedgehogs (processes), intermediating communication between them
+(signals, pipes, sockets, files), and adjudicating use of resources
+(CPU, screen, keyboard, network card).  There is less of a definite
+problem to solve, though, and method selection is pretty manual, so I
+don't know whether Linux is a fox in this sense.
+
+For the mathematically inclined, a
+[sheaf](https://en.wikipedia.org/wiki/Sheaf_%28mathematics%29) is the
+only example I know about of a mathematical structure which is a fox.
+The gluing axiom is analogous to the all-important bridges.
+
+Notes
+-----
+
+[^not-really]: Actually, my main point, to the extent I have one, is that this is
+not so.  The fox must know how to connect the hedgehogs together and
+make them cooperate; which perhaps necessitates a still-deeper
+understanding of the domain than each hedgehog embodies.  And, of
+course, the whole point of a fox is that it does lead to better
+coverage, by covering problems that have parts that stymie each
+hedgehog.
