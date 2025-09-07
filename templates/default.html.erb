@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href='https://fonts.googleapis.com/css?family=Merriweather+Sans:800,400italic|Inconsolata:400|Merriweather:400,400italic' rel='stylesheet' type='text/css'>
+
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta content="width=device-width" name="viewport">
+  <title><%= Nokogiri::HTML(current_page.data.title || site.title).xpath("//text()").to_s %></title>
+
+  <meta name="description" content="<%= current_page.data.description %>" />
+  <meta name="keywords" content="<%= current_page.data.keywords %>" />
+  <meta name="author" content="<%= current_page.data.author %>" />
+
+  <!--[if lte IE 7 ]> <link rel="stylesheet" href="css/ie7.css" type="text/css"> <![endif]-->
+  <!--[if IE 8 ]> <link rel="stylesheet" href="css/ie8.css" type="text/css"> -->
+  <%= stylesheet_link_tag 'erudite' %>
+  <%= favicon_tag site.favicon %>
+  <link rel="alternate" type="application/rss+xml" title="<%= site.title %> Updates -- RSS" href="/feed.xml" />
+  <% if !current_page.data.style.nil? %>
+  <%= current_page.data.style %>
+  <% end %>
+</head>
+
+<body>
+
+  <div id="wrapper" class="hfeed">
+    <div id="header-wrap">
+      <div id="header" role="banner">
+        <h1 id="blog-title"><span><a href="/" title="" rel="home"><%= site.title %></a></span></h1>
+        <div id="blog-description"></div>
+      </div><!--  #header -->
+      <div id="access" role="navigation">
+        <div class="skip-link"><a href="#content" title=""></a></div>
+      </div><!-- #access -->
+    </div><!--  #header-wrap -->
+
+    <div id="container">
+      <div id="content" role="main">
+        <%= yield %>
+      </div><!-- #content -->
+    </div><!-- #container -->
+
+    <div id="footer">
+    </div><!-- #footer -->
+  </div><!-- #wrapper .hfeed -->
+
+<% if !site.google_analytics_snippet.nil? %>
+<%= site.google_analytics_snippet %>
+<% end %>
+</body>
+</html>
