@@ -16,11 +16,11 @@ Usage
   (images, attachments), it will be copied to ideas/2017/compositional-statistical-unit-testing/…
 
 • Dev loop (Preview; includes unpublished):
-    cabal run site -- watch
+    cabal run conversations -- watch
   Browse http://127.0.0.1:8000/  (hit refresh after edits)
 
 • Production build (excludes unpublished):
-    cabal run site -- build
+    cabal run conversations -- build
   Output goes to _site/ ready to publish (e.g., GitHub Pages).
 
 • Pin versions fully:
