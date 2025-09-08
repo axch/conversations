@@ -9,6 +9,10 @@ import Data.Text.Lazy qualified as TL
 import Control.Monad (filterM, forM_)
 import Data.Maybe (fromMaybe)
 import Data.Map.Strict qualified as M
+import Data.List (sortBy)
+import Data.Ord (Down(..), comparing)
+import Data.Time (UTCTime, defaultTimeLocale)
+import Data.Time.Format (parseTimeM)
 
 import Hakyll
 import Lucid (renderText)
@@ -81,7 +85,7 @@ rules mode = do
   paginateRules paginate $ \pageNum patternForPage -> do
     route idRoute
     compile $ do
-      items <- loadAll patternForPage
+      items <- recentFirst =<< loadAll patternForPage
       -- Convert Items into minimal PostCards for our Lucid renderer.
       cards <- mapM toCard items
       let total = M.size $ paginateMap paginate
@@ -126,13 +130,30 @@ retrieveFromContext ctx key item = do
   where
     retrieveFromContext' (Context f) k = f k
 
+-- | Sort identifiers by date metadata, most recent first.
+-- Works in Rules monad by reading metadata directly.
+recentFirstIds :: [Identifier] -> Rules [Identifier]
+recentFirstIds ids = do
+  idsWithDates <- mapM getDateFromId ids
+  let sorted = sortBy (comparing (Down . snd)) idsWithDates
+  pure $ map fst sorted
+  where
+    getDateFromId :: Identifier -> Rules (Identifier, UTCTime)
+    getDateFromId ident = do
+      meta <- getMetadata ident
+      let dateStr = fromMaybe "1970/01/01" $ lookupString "date" meta
+          parsedDate = fromMaybe (read "1970-01-01 00:00:00 UTC") $
+                       parseTimeM True defaultTimeLocale "%Y/%m/%d" dateStr
+      pure (ident, parsedDate)
+
 -- | Decide which posts participate in pagination, in order, grouped by size.
 -- Ignore the incoming list of identifiers because we also filter out
 -- unpublished posts.
 archiveGrouper :: BuildMode -> [Identifier] -> Rules [[Identifier]]
 archiveGrouper mode ids = do
   ids' <- filterM (includeItem mode) ids
-  pure $ paginateEvery perPage ids'
+  sortedIds <- recentFirstIds ids'
+  pure $ paginateEvery perPage sortedIds
 
 -- | Id builder for paginate: first page at /index.html, then /N/index.html.
 makeArchiveId :: PageNumber -> Identifier
