@@ -53,7 +53,7 @@ isPublishedMeta meta =
 postCtx :: BuildMode -> Context String
 postCtx _mode =
   prettyDateField "date_pretty" <>
-  defaultContext
+  siteCtx
 
 -- | When routing assets, we may want to look at the main post’s metadata
 -- (to drop unpublished assets in production). Given an asset Identifier,

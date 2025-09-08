@@ -1,0 +1,35 @@
+<article class="hentry" itemscope itemtype="http://schema.org/BlogPosting">
+  $if(epigraph)$
+    <blockquote class="epigraph"><p>$epigraph$
+    </p></blockquote>
+  $endif$
+  <header>
+    <h2 class="entry-title" itemprop="name">$title$</h2>
+  </header>
+
+  <div class="entry-meta">
+$if(date_written)$
+    <span>Written</span>
+    <span>$date_written$</span>
+    <span>Published here</span>
+$endif$
+    <span class="entry-date">
+      <abbr class="published">$date_pretty$</abbr>
+    </span>
+    <span class="author vcard">
+      By $author$
+    </span>
+  </div>
+
+  <div class="entry-content" itemprop="articleBody">
+    $body$
+  </div>
+
+  <footer>
+    <div class="metadata">
+    </div>
+    <div class="nav-back">
+      <a href="/" title="">← $sitename$ index</a>
+    </div>
+  </footer>
+</article>
