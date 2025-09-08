@@ -57,14 +57,14 @@ postCtx _mode =
 
 -- | When routing assets, we may want to look at the main post’s metadata
 -- (to drop unpublished assets in production). Given an asset Identifier,
--- compute the path of its main .html.pmd and read that metadata.
+-- compute the path of its main .html.md and read that metadata.
 readMainPostMeta :: (MonadMetadata m) => Identifier -> m Metadata
 readMainPostMeta assetId = do
   let fp = toFilePath assetId
   -- Example asset: posts/2017-11-19-slug/figs/chart.png
-  -- Main post metadata lives at: posts/2017-11-19-slug.html.pmd
+  -- Main post metadata lives at: posts/2017-11-19-slug.html.md
   let dirName = takeBaseName $ takeDirectory fp
-  let main = fromFilePath $ "posts/" ++ dirName ++ ".html.pmd"
+  let main = fromFilePath $ "posts/" ++ dirName ++ ".html.md"
   getMetadata main
   where
     takeDirectory = reverse . dropWhile (/= '/') . reverse

@@ -50,7 +50,7 @@ rules mode = do
 
   -- 3) Posts (Pandoc Markdown to HTML), with nested layouts:
   --    templates/post.html → templates/default.html
-  match "posts/*.html.pmd" $ do
+  match "posts/*.html.md" $ do
     -- Conditionally hide unpublished posts in Production by dropping the route.
     route $ metadataRoute $ \meta ->
       if includeInBuild mode meta then postRoute else mempty
@@ -76,7 +76,7 @@ rules mode = do
       else return ()
 
   -- 5) Paginated archive at "/" and then "/2/", "/3/", ...
-  let postsPattern = "posts/*.html.pmd"
+  let postsPattern = "posts/*.html.md"
   paginate <- buildPaginateWith (archiveGrouper mode) postsPattern makeArchiveId
 
   paginateRules paginate $ \pageNum patternForPage -> do

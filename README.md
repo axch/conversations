@@ -1,7 +1,7 @@
 ────────────────────────────────────────────────────────────────────────────
 Usage
 ────────────────────────────────────────────────────────────────────────────
-• Author a post at: posts/2017-11-19-compositional-statistical-unit-testing.html.pmd
+• Author a post at: posts/2017-11-19-compositional-statistical-unit-testing.html.md
   with front‑matter like:
 
   ---

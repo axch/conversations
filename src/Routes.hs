@@ -6,7 +6,7 @@ module Routes
   ) where
 
 -- This module centralizes routing rules so you have one place to tweak URLs.
--- We map:   posts/YYYY-MM-DD-slug.html.pmd  →  ideas/YYYY/slug/index.html
+-- We map:   posts/YYYY-MM-DD-slug.html.md   →  ideas/YYYY/slug/index.html
 -- and:      posts/YYYY-MM-DD-slug/(assets)  →  ideas/YYYY/slug/(assets)
 
 import Hakyll
@@ -29,10 +29,10 @@ parsePostBase base =
       "" -> []
       s' -> w : wordsBy p s'' where (w, s'') = break p s'
 
--- | Route for post pages (called on Identifier of the .pmd file).
+-- | Route for post pages (called on Identifier of the .md file).
 postRoute :: Routes
 postRoute = customRoute $ \ident ->
-  let fp    = toFilePath ident                 -- posts/YYYY-MM-DD-slug.html.pmd
+  let fp    = toFilePath ident                 -- posts/YYYY-MM-DD-slug.html.md
       base0 = takeBaseName fp                  -- YYYY-MM-DD-slug.html
       base  = dropExtension base0              -- YYYY-MM-DD-slug
   in case parsePostBase base of
