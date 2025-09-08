@@ -1,0 +1,35 @@
+cabal-version:      3.8
+name:               conversations
+version:            0.1.0.0
+synopsis:           Hakyll+Lucid static site generator for Conversations blog
+category:           Web
+author:             Alexey Radul
+maintainer:         you@example.com
+license:            BSD-3-Clause
+build-type:         Simple
+
+common common-opts
+  default-language: Haskell2010
+  ghc-options: -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates -Wcompat
+  ghc-options: -O2
+
+executable conversations
+  import:           common-opts
+  hs-source-dirs:   src
+  main-is:          Site.hs
+  other-modules:
+    Types
+    Routes
+    Context
+    Templates
+  build-depends:
+      base                 >= 4.18 && < 4.19
+    , hakyll               >= 4.15
+    , lucid                >= 2.11
+    , text                 >= 2.0
+    , time                 >= 1.12
+    , filepath             >= 1.4
+    , directory            >= 1.3
+    , containers           >= 0.6
+  default-extensions:
+    OverloadedStrings

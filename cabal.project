@@ -1,0 +1,4 @@
+packages: .
+-- Pin the index so dependency resolution is reproducible. Adjust as you like.
+index-state: 2025-09-01T00:00:00Z
+allow-newer: False
