@@ -107,6 +107,18 @@ a:active {color:#55f;}
 .nav-next {float:right;}
 #nav-below a {color:#fff; padding:0 1em; line-height:2; height:100%; font-size:.75em; display:block;}
 
+/* Pagination of the index */
+.pager {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+.prev-link, .next-link, .pages {
+    flex: 1; /* reserve equal space left/right */
+}
+.pages { text-align: center; }
+.next-link { text-align: right; }
+
 /* Footer Toggle */
 #foot-toggle {clear:both;}
 #foot-toggle div {position:relative; width:60em; margin:0 auto; text-align:right; height:2.25em;}

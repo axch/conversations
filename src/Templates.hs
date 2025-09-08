@@ -6,7 +6,8 @@ module Templates
 -- place to grow a real component system (cards, badges, pagers, …) with types.
 
 import Lucid
-import qualified Data.Text as T
+import Data.List (intersperse)
+import Data.Text qualified as T
 
 -- | Minimal post card for the archive. You’ll iterate on this later.
 data PostCard = PostCard
@@ -38,19 +39,22 @@ archivePageHtml page total posts = do
       | otherwise = nav_ [class_ "pager"] $ do
           -- We keep the first page at "/", later pages at "/N/".
           let linkFor n = if n == 1 then "/" else T.pack ("/" <> show n <> "/")
-          ul_ $ do
-            -- Previous
+          -- Previous
+          div_ [class_ "prev-link"] $
             if p > 1
-              then li_ $ a_ [href_ (linkFor (p-1))] "← Prev"
-              else li_ [class_ "disabled"] "← Prev"
-            -- Page numbers
-            mapM_ (pageLi p) [1..t]
-            -- Next
+              then a_ [href_ (linkFor (p-1))] "← Newer"
+              else return ()
+          -- Page numbers
+          div_ [class_ "pages"] $
+            mconcat $ intersperse (toHtml (", " :: String)) $
+              map (pageA p) [1..t]
+          -- Next
+          div_ [class_ "next-link"] $
             if p < t
-              then li_ $ a_ [href_ (linkFor (p+1))] "Next →"
-              else li_ [class_ "disabled"] "Next →"
+              then a_ [href_ (linkFor (p+1))] "Older →"
+              else return ()
 
-    pageLi :: Int -> Int -> Html ()
-    pageLi p n
-      | n == p    = li_ [class_ "current"] (toHtml $ show n)
-      | otherwise = li_ $ a_ [href_ (if n == 1 then "/" else T.pack ("/" <> show n <> "/"))] (toHtml $ show n)
+    pageA :: Int -> Int -> Html ()
+    pageA p n
+      | n == p    = span_ [class_ "current"] (toHtml $ show n)
+      | otherwise = span_ $ a_ [href_ (if n == 1 then "/" else T.pack ("/" <> show n <> "/"))] (toHtml $ show n)
