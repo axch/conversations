@@ -16,7 +16,7 @@ sup { vertical-align:super; }
 sub { vertical-align:sub; }
 
 /* Typography Test */
-body.baseline {background-image:url(body-bg.png); background-repeat:repeat; background-position:left 20px;}
+body.baseline {background-image:url(../images/body-bg.png); background-repeat:repeat; background-position:left 20px;}
 
 /* Layout */
 #container, #header {max-width:50em; margin:0 auto; position:relative;}
@@ -30,7 +30,7 @@ body.single #content, body.page #content {overflow:visible;}
 #footer {clear:both;}
 
 /* Page Header */
-#header-wrap {background:#333 url(stripes.png) repeat; margin-bottom:1.25em;}
+#header-wrap {background:#333 url(../images/stripes.png) repeat; margin-bottom:1.25em;}
 #header h1, #header h1 a {color:#fff; text-decoration:none; line-height:1; margin:0;}
 #blog-description {font-size:.875em; color:#fff;}
 
@@ -142,7 +142,7 @@ a:active {color:#55f;}
 div.post, div.page, div.attachment {position:relative; margin:0 0 2em; min-height:13.5em; clear:both;}
 div.post:after, div.page:after {clear:both;content:' ';display:block;font-size:0;line-height:0;visibility:hidden;width:0;height:0}/*clearfix*/
 .post .shortened {overflow:hidden !important;}
-.entry-content hr, .hr {height:3em; background:url(fleuron.png) center 1em no-repeat; margin:0 0 1.5em; display:block; border-width:0px; border-style: none !important;}
+.entry-content hr, .hr {height:3em; background:url(../images/fleuron.png) center 1em no-repeat; margin:0 0 1.5em; display:block; border-width:0px; border-style: none !important;}
 article.preview .entry-title, article.preview .entry-title a {color:#555; text-decoration:none;}
 article.preview .entry-title a:hover {text-decoration:underline;}
 article.preview .entry-title {margin:0; line-height:1.5;}
@@ -186,7 +186,7 @@ body .entry-content > p:first-child:first-letter, .first-post .entry-content > p
   line-height:0.95;}
 .entry-content > p:first-child:first-letter {
   float:left;
-  background:#555 url(stripes.png) repeat;
+  background:#555 url(../images/stripes.png) repeat;
   color:#fff;
   margin:.05em .1em 0 0;
   padding:.1em;}
@@ -339,7 +339,7 @@ body.dark {
 	background-color:#222;
 }
 .dark #header-wrap {
-	background-image:url(stripes-dark.png);
+	background-image:url(../images/stripes-dark.png);
 }
 .dark #header-wrap, .dark #footer-wrap, .dark #menu-toggle div, .dark #foot-toggle span, .dark #nav-below a {
 	background-color:#fffff6;
@@ -373,7 +373,7 @@ body.dark {
 .dark a:active {color:#eec;}
 .dark .entry-content a {border-color:#777;}
 .dark .entry-content a:hover {text-decoration:none; border-color:#ddd;}
-.dark .entry-content hr, .dark .hr {background-image:url(fleuron-dark.png);}
+.dark .entry-content hr, .dark .hr {background-image:url(../images/fleuron-dark.png);}
 
 /* Pandoc Footnotes */
 /* Can do unraised bracketed style: [1] */
