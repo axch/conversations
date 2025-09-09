@@ -21,16 +21,18 @@ data PostCard = PostCard
 -- The posts are the ones on this page, not all of them.
 archivePageHtml :: Int -> Int -> [PostCard] -> Html ()
 archivePageHtml page total posts = do
-  h1_ [class_ "text-2xl"] "Posts"
-  ul_ [class_ "posts"] $ mapM_ postItem posts
+  mapM_ postItem posts
   pager page total
   where
     postItem :: PostCard -> Html ()
-    postItem pc = li_ [class_ "post-card"] $ do
-      h3_ $ a_ [href_ (pcUrl pc)] (toHtml $ pcTitle pc)
-      p_  [class_ "meta"] (toHtml $ pcDate pc)
+    postItem pc = article_ [class_ "preview"] $ do
+      h2_ [class_ "entry-title"] $ a_ [href_ (pcUrl pc)] (toHtmlRaw $ pcTitle pc)
+      div_  [class_ "dateline"] $ time_ (toHtml $ pcDate pc)
       case pcSummary pc of
-        Just s  -> p_ [class_ "summary"] (toHtml s)
+        Just s  -> div_ [class_ "entry-content"] $
+                     p_ [] $ do
+                       (toHtml s)
+                       a_ [href_ (pcUrl pc)] "Read more"
         Nothing -> mempty
 
     pager :: Int -> Int -> Html ()
