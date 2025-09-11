@@ -114,10 +114,11 @@ toCard i = do
   mroute <- getRoute $ itemIdentifier i
   let url   = maybe "#" toUrl mroute
       ttl   = fromMaybe "(untitled)" $ lookupString "title" meta
-  -- Use the preformatted date field if available (from postCtx), or fall back.
-  datePretty <- retrieveFromContext (prettyDateField "date_pretty") "date_pretty" i
+  (Just datePretty) <- prettyDate "date" i
+  dateWrittenPretty <- prettyDate "date_written" i
   body <- loadSnapshotBody (itemIdentifier i) "content"
-  pure $ PostCard (T.pack url) (T.pack ttl) (T.pack datePretty) $
+  pure $ PostCard (T.pack url) (T.pack ttl) (T.pack datePretty)
+           (T.pack <$> dateWrittenPretty) $
        Just $ cardPreview $ T.pack $ stripTags body
 
 takeWords :: Int -> T.Text -> T.Text
@@ -135,18 +136,6 @@ stripReadmore content =
   case T.splitOn "READMORE" $ T.pack content of
     [whole] -> T.unpack whole  -- No READMORE found
     parts -> T.unpack $ mconcat parts  -- Remove all READMORE occurrences
-
--- | Helper to extract a field from a Context for a specific Item.
--- (Hakyll doesn’t expose this directly; this is a small utility.)
-retrieveFromContext :: Context a -> String -> Item a -> Compiler String
-retrieveFromContext ctx key item = do
-  mb <- retrieveFromContext' ctx key [] item
-  case mb of
-    EmptyField -> pure ""
-    StringField s -> pure s
-    ListField _ _ -> pure ""
-  where
-    retrieveFromContext' (Context f) k = f k
 
 -- | Sort identifiers by date metadata, most recent first.
 -- Works in Rules monad by reading metadata directly.

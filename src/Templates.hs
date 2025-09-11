@@ -9,11 +9,12 @@ import Lucid
 import Data.List (intersperse)
 import Data.Text qualified as T
 
--- | Minimal post card for the archive. You’ll iterate on this later.
+-- | Minimal post card for the archive. You'll iterate on this later.
 data PostCard = PostCard
   { pcUrl    :: T.Text
   , pcTitle  :: T.Text
   , pcDate   :: T.Text
+  , pcDateWritten :: Maybe T.Text
   , pcSummary :: Maybe T.Text
   }
 
@@ -27,7 +28,10 @@ archivePageHtml page total posts = do
     postItem :: PostCard -> Html ()
     postItem pc = article_ [class_ "preview"] $ do
       h2_ [class_ "entry-title"] $ a_ [href_ (pcUrl pc)] (toHtmlRaw $ pcTitle pc)
-      div_  [class_ "dateline"] $ time_ (toHtml $ pcDate pc)
+      div_ [class_ "dateline"] $ time_ $
+        case pcDateWritten pc of
+          Just written -> toHtml $ "Written " <> written <> "; published here " <> pcDate pc
+          Nothing -> toHtml $ pcDate pc
       case pcSummary pc of
         Just s  -> div_ [class_ "entry-content"] $
                      p_ [] $ do

@@ -3,7 +3,9 @@ module Context
   , postCtx
   , includeInBuild
   , isPublishedMeta
+  , prettyDate
   , prettyDateField
+  , tryParseDateFormats
   , readMainPostMeta
   ) where
 
@@ -23,21 +25,31 @@ siteCtx =
   constField "sitename" "Conversations" <>
   defaultContext
 
--- | Parse a YYYY/MM/DD date or YYYY/MM/DD H:M:S timestamp from metadata key "date" and render nicely.
--- If missing or unparsable, fall back to the raw value.
-prettyDateField :: String -> Context a
-prettyDateField key = field key $ \i -> do
+-- | Helper function to parse date formats
+tryParseDateFormats :: String -> Maybe UTCTime
+tryParseDateFormats s =
+  parseTimeM True defaultTimeLocale "%Y/%m/%d" s <|>
+  parseTimeM True defaultTimeLocale "%Y/%m/%d %H:%M:%S" s
+
+-- | Parse a YYYY/MM/DD date or YYYY/MM/DD H:M:S timestamp from
+-- metadata key and render nicely.
+prettyDate :: String -> Item a -> Compiler (Maybe String)
+prettyDate key i = do
   meta <- getMetadata $ itemIdentifier i
-  case lookupString "date" meta of
+  case lookupString key meta of
     Just s -> case tryParseDateFormats s of
-      Just t  -> pure $ formatTime defaultTimeLocale "%B %e, %Y" t
-      Nothing -> pure s
-    Nothing -> pure ""
-  where
-    tryParseDateFormats :: String -> Maybe UTCTime
-    tryParseDateFormats s =
-      parseTimeM True defaultTimeLocale "%Y/%m/%d" s <|>
-      parseTimeM True defaultTimeLocale "%Y/%m/%d %H:%M:%S" s
+      Just t  -> return $ Just $ formatTime defaultTimeLocale "%B %e, %Y" t
+      Nothing -> return $ Just s
+    Nothing -> return Nothing
+
+-- | Transform the given key field, which should be a date,
+-- into the given other key.
+prettyDateField :: String -> String -> Context a
+prettyDateField in_key out_key = field out_key (\i -> do
+  pretty_date <- prettyDate in_key i
+  case pretty_date of
+    Just s -> pure s
+    Nothing -> pure "")
 
 -- | True when a post should be visible in the current build mode.
 includeInBuild :: BuildMode -> Metadata -> Bool
@@ -55,10 +67,11 @@ isPublishedMeta meta =
     _             -> True
 
 -- | Per‑post context: adds formatted date and passes through front‑matter.
--- You’ll extend this later with epigraphs or separate authored/published dates.
+-- You'll extend this later with epigraphs or separate authored/published dates.
 postCtx :: BuildMode -> Context String
 postCtx _mode =
-  prettyDateField "date_pretty" <>
+  prettyDateField "date" "date_pretty" <>
+  prettyDateField "date_written" "date_written_pretty" <>
   siteCtx
 
 -- | When routing assets, we may want to look at the main post’s metadata
