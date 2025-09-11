@@ -15,6 +15,7 @@ import Types (BuildMode(..))
 import Data.Char (toLower)
 import Data.Time (UTCTime, defaultTimeLocale, formatTime)
 import Data.Time.Format (parseTimeM)
+import Control.Applicative ((<|>))
 
 -- | Global site context: add fields that are available everywhere.
 siteCtx :: Context String
@@ -22,16 +23,21 @@ siteCtx =
   constField "sitename" "Conversations" <>
   defaultContext
 
--- | Parse a YYYY/MM/DD date from metadata key "date" and render nicely.
+-- | Parse a YYYY/MM/DD date or YYYY/MM/DD H:M:S timestamp from metadata key "date" and render nicely.
 -- If missing or unparsable, fall back to the raw value.
 prettyDateField :: String -> Context a
 prettyDateField key = field key $ \i -> do
   meta <- getMetadata $ itemIdentifier i
   case lookupString "date" meta of
-    Just s -> case parseTimeM True defaultTimeLocale "%Y/%m/%d" s :: Maybe UTCTime of
+    Just s -> case tryParseDateFormats s of
       Just t  -> pure $ formatTime defaultTimeLocale "%B %e, %Y" t
       Nothing -> pure s
     Nothing -> pure ""
+  where
+    tryParseDateFormats :: String -> Maybe UTCTime
+    tryParseDateFormats s =
+      parseTimeM True defaultTimeLocale "%Y/%m/%d" s <|>
+      parseTimeM True defaultTimeLocale "%Y/%m/%d %H:%M:%S" s
 
 -- | True when a post should be visible in the current build mode.
 includeInBuild :: BuildMode -> Metadata -> Bool
