@@ -281,7 +281,7 @@ by charging deferring taxpayers excess interest (maybe just a little
 more to cover the cost of administering the program, but that's it).
 The point is that this has to not feel usurious or exploitative to the
 people eligible to take advantage of it---just the town passing on
-their own costs, as transparent and fair as can be.  How much might of
+their own costs, as transparent and fair as can be.  How much of
 Belmont's total revenue might people defer?  10%?  Can Belmont ink a
 bank deal where the town gets to just decide to borrow around $10
 million any given year, depending on the whims of its taxpayers?  What
