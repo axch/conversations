@@ -59,7 +59,8 @@ rules mode = do
       if includeInBuild mode meta then postRoute else mempty
 
     compile $ do
-      item <- pandocCompiler
+      item <- fmap (fmap stripReadmore) getResourceBody -- Remove READMORE markers
+        >>= renderPandoc  -- Convert markdown to HTML
         >>= saveSnapshot "content"  -- used later for feeds/excerpts if you want
         >>= loadAndApplyTemplate "templates/post.html"    (postCtx mode)
         >>= loadAndApplyTemplate "templates/default.html" (postCtx mode)
@@ -127,6 +128,13 @@ cardPreview body =
   case T.splitOn "READMORE" body of
     (teaser:_:_)  -> teaser  -- A nontrivial split gives at least two parts
     _ -> takeWords 44 body <> "... "
+
+-- | Strip READMORE markers from markdown content before processing
+stripReadmore :: String -> String
+stripReadmore content =
+  case T.splitOn "READMORE" $ T.pack content of
+    [whole] -> T.unpack whole  -- No READMORE found
+    parts -> T.unpack $ mconcat parts  -- Remove all READMORE occurrences
 
 -- | Helper to extract a field from a Context for a specific Item.
 -- (Hakyll doesn’t expose this directly; this is a small utility.)
