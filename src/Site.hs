@@ -115,8 +115,18 @@ toCard i = do
       ttl   = fromMaybe "(untitled)" $ lookupString "title" meta
   -- Use the preformatted date field if available (from postCtx), or fall back.
   datePretty <- retrieveFromContext (prettyDateField "date_pretty") "date_pretty" i
-  let msum = fmap T.pack $ lookupString "summary" meta
-  pure $ PostCard (T.pack url) (T.pack ttl) (T.pack datePretty) msum
+  body <- loadSnapshotBody (itemIdentifier i) "content"
+  pure $ PostCard (T.pack url) (T.pack ttl) (T.pack datePretty) $
+       Just $ cardPreview $ T.pack $ stripTags body
+
+takeWords :: Int -> T.Text -> T.Text
+takeWords n = T.unwords . take n . T.words
+
+cardPreview :: T.Text -> T.Text
+cardPreview body =
+  case T.splitOn "READMORE" body of
+    (teaser:_:_)  -> teaser  -- A nontrivial split gives at least two parts
+    _ -> takeWords 44 body <> "... "
 
 -- | Helper to extract a field from a Context for a specific Item.
 -- (Hakyll doesn’t expose this directly; this is a small utility.)
