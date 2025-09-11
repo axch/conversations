@@ -13,8 +13,7 @@ no one actually has and that don't even work.  An irritation at best,
 sheer deceit and manipulation at worst.  But in fact, what evils
 afflict the institution of advertising are reflections of its poor
 implementation, not of its superfluity.  The reason advertising exists is
-READMORE
-that it is chewing on one of the most important problems in an economy
+READMORE that it is chewing on one of the most important problems in an economy
 as large as ours: You have 300,000,000 people in the country, which have
 needs, desires, and abilities.  How do you arrange to take the best
 advantage of their abilities, do the best job of meeting their needs,
