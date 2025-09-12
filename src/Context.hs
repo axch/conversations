@@ -29,7 +29,7 @@ siteCtx =
 tryParseDateFormats :: String -> Maybe UTCTime
 tryParseDateFormats s =
   parseTimeM True defaultTimeLocale "%Y/%m/%d" s <|>
-  parseTimeM True defaultTimeLocale "%Y/%m/%d %H:%M:%S" s
+  parseTimeM True defaultTimeLocale "%Y/%m/%d %k:%M:%S" s
 
 -- | Parse a YYYY/MM/DD date or YYYY/MM/DD H:M:S timestamp from
 -- metadata key and render nicely.
