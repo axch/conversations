@@ -68,8 +68,8 @@ isPublishedMeta meta =
 
 -- | Per‑post context: adds formatted date and passes through front‑matter.
 -- You'll extend this later with epigraphs or separate authored/published dates.
-postCtx :: BuildMode -> Context String
-postCtx _mode =
+postCtx :: Context String
+postCtx =
   prettyDateField "date" "date_pretty" <>
   prettyDateField "date_written" "date_written_pretty" <>
   siteCtx

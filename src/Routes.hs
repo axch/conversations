@@ -16,6 +16,9 @@ import System.FilePath
   )
 import Data.List (intercalate)
 
+import Context
+import Types
+
 -- | For a post filename base like "2017-11-19-my-post", extract (year, slug).
 -- We accept arbitrary additional hyphens in the slug part.
 parsePostBase :: FilePath -> Maybe (String, String)
@@ -29,9 +32,15 @@ parsePostBase base =
       "" -> []
       s' -> w : wordsBy p s'' where (w, s'') = break p s'
 
--- | Route for post pages (called on Identifier of the .md file).
-postRoute :: Routes
-postRoute = customRoute $ \ident ->
+-- Conditionally hide unpublished posts in Production by dropping the route.
+postRoute :: BuildMode -> Routes
+postRoute mode = metadataRoute $ \meta ->
+  if includeInBuild mode meta then publishedPostRoute else mempty
+
+-- | Route for post pages (called on Identifier of the .md file)
+-- that we know are published.
+publishedPostRoute :: Routes
+publishedPostRoute = customRoute $ \ident ->
   let fp    = toFilePath ident                 -- posts/YYYY-MM-DD-slug.html.md
       base0 = takeBaseName fp                  -- YYYY-MM-DD-slug.html
       base  = dropExtension base0              -- YYYY-MM-DD-slug

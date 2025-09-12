@@ -54,19 +54,9 @@ rules mode = do
   -- 3) Posts (Pandoc Markdown to HTML), with nested layouts:
   --    templates/post.html → templates/default.html
   match "posts/*.html.md" $ do
-    -- Conditionally hide unpublished posts in Production by dropping the route.
-    route $ metadataRoute $ \meta ->
-      if includeInBuild mode meta then postRoute else mempty
+    route $ postRoute mode
 
-    compile $ do
-      item <- fmap (fmap stripReadmore) getResourceBody -- Remove READMORE markers
-        >>= renderPandoc  -- Convert markdown to HTML
-        >>= saveSnapshot "content"  -- used later for feeds/excerpts if you want
-        >>= loadAndApplyTemplate "templates/post.html"    (postCtx mode)
-        >>= loadAndApplyTemplate "templates/default.html" (postCtx mode)
-        >>= relativizeUrls
-
-      pure item
+    compile $ getResourceBody >>= postCompile
 
   -- 4) Per‑post asset directories copied verbatim next to the post.
   --    We only copy assets for posts included in this build mode.
@@ -101,11 +91,19 @@ rules mode = do
   create ["feed.xml"] $ do
     route idRoute
     compile $ do
-      let feedCtx = postCtx mode <> bodyField "description"
+      let feedCtx = postCtx <> bodyField "description"
       posts <- loadAllSnapshots postsPattern "content"
       posts' <- filterM (\post -> includeItem mode $ itemIdentifier post) posts
       recent <- recentFirst posts'
       renderRss feedConfig feedCtx recent
+
+postCompile :: Item String -> Compiler (Item String)
+postCompile post = -- Remove READMORE markers
+  renderPandoc ((fmap stripReadmore) post) -- Convert markdown to HTML
+  >>= saveSnapshot "content"  -- used later for feeds/excerpts if you want
+  >>= loadAndApplyTemplate "templates/post.html"    postCtx
+  >>= loadAndApplyTemplate "templates/default.html" postCtx
+  >>= relativizeUrls
 
 -- | Turn an Item into a PostCard for the archive list.
 toCard :: Item String -> Compiler PostCard
