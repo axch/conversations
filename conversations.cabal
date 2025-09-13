@@ -22,6 +22,7 @@ executable conversations
     Routes
     Context
     Templates
+    AnimatedAnalysis
   build-depends:
       base                 >= 4.18 && < 4.19
     , hakyll               >= 4.15
