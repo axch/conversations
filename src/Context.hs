@@ -18,6 +18,7 @@ import Data.Char (toLower)
 import Data.Time (UTCTime, defaultTimeLocale, formatTime)
 import Data.Time.Format (parseTimeM)
 import Control.Applicative ((<|>))
+import Data.Maybe (fromMaybe)
 
 -- | Global site context: add fields that are available everywhere.
 siteCtx :: Context String
@@ -72,6 +73,10 @@ postCtx :: Context String
 postCtx =
   prettyDateField "date" "date_pretty" <>
   prettyDateField "date_written" "date_written_pretty" <>
+  field "title_plain" (\item -> do
+    metadata <- getMetadata $ itemIdentifier item
+    let title = fromMaybe "(untitled)" $ lookupString "title" metadata
+    return $ stripTags title) <>
   siteCtx
 
 -- | When routing assets, we may want to look at the main post’s metadata
