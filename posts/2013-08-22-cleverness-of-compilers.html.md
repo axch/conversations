@@ -105,7 +105,7 @@ What do you think the inner loop of that program looks like?  You
 could be forgiven for thinking that it looks something like this:
 
 ```javascript
-<%= File.read(File.expand_path("2013-08-22-cleverness-of-compilers/mandel.js", File.dirname(__FILE__))) %>
+{{{mandel_js}}}
 ```
 
 If you thought that, you would not be entirely wrong, because that is,

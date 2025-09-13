@@ -5,6 +5,7 @@ module Main (main) where
 -- This is the heart of the generator.
 
 import Data.Text qualified as T
+import Data.Text.IO qualified as T
 import Data.Text.Lazy qualified as TL
 import Control.Monad (filterM, forM_)
 import Data.Maybe (fromMaybe)
@@ -50,6 +51,17 @@ rules mode = do
 
   -- 2) Templates
   match "templates/*" $ compile templateBodyCompiler
+
+  -- 3a) Special handling for Cleverness of Compilers
+  rulesExtraDependencies
+    [IdentifierDependency "posts/2013-08-22-cleverness-of-compilers/mandel.js"] $
+    match "posts/2013-08-22-cleverness-of-compilers.html.md" $ do
+      route $ postRoute mode
+      compile $ do
+        js <- unsafeCompiler $ T.readFile "posts/2013-08-22-cleverness-of-compilers/mandel.js"
+        let replace = T.unpack . T.replace "{{{mandel_js}}}" js . T.pack
+        fmap (fmap replace) getResourceBody
+          >>= postCompile
 
   -- 3) Posts (Pandoc Markdown to HTML), with nested layouts:
   --    templates/post.html → templates/default.html
