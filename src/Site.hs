@@ -15,8 +15,9 @@ import Data.Ord (Down(..), comparing)
 import Data.Time (UTCTime, defaultTimeLocale)
 import Data.Time.Format (parseTimeM)
 
-import Hakyll
+import Hakyll hiding (renderPandoc)
 import Lucid (renderText)
+import Text.Pandoc.Options
 
 import Types
 import Routes
@@ -191,3 +192,23 @@ feedConfig = FeedConfiguration
   , feedAuthorEmail = ""
   , feedRoot        = "https://alexey.radul.name"
   }
+
+-- Pandoc configuration
+readerOpts :: ReaderOptions
+readerOpts =
+  -- “--from=markdown”
+  defaultHakyllReaderOptions
+    { readerExtensions = pandocExtensions
+    }
+
+writerOpts :: WriterOptions
+writerOpts =
+  let base = defaultHakyllWriterOptions
+      -- “--to=html5-smart”  → HTML5 is the default; enable the “smart” extension
+  in base
+      { writerExtensions     = enableExtension Ext_smart (writerExtensions base)
+      , writerHTMLMathMethod = MathJax ""  -- “--mathjax”, without injecting the script tag
+      }
+
+renderPandoc :: Item String -> Compiler (Item String)
+renderPandoc = renderPandocWith readerOpts writerOpts

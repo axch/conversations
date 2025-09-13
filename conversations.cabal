@@ -25,6 +25,7 @@ executable conversations
   build-depends:
       base                 >= 4.18 && < 4.19
     , hakyll               >= 4.15
+    , pandoc               >= 3.7
     , lucid                >= 2.11
     , text                 >= 2.0
     , time                 >= 1.12
