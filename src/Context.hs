@@ -80,11 +80,10 @@ postCtx =
 readMainPostMeta :: (MonadMetadata m) => Identifier -> m Metadata
 readMainPostMeta assetId = do
   let fp = toFilePath assetId
-  -- Example asset: posts/2017-11-19-slug/figs/chart.png
+  -- Example asset: posts/2017-11-19-slug/chart.png
   -- Main post metadata lives at: posts/2017-11-19-slug.html.md
-  let dirName = takeBaseName $ takeDirectory fp
+  let dirName = drop (length ("posts/" :: String)) $ takeDirectory fp
   let main = fromFilePath $ "posts/" ++ dirName ++ ".html.md"
   getMetadata main
   where
-    takeDirectory = reverse . dropWhile (/= '/') . reverse
-    takeBaseName p = reverse . takeWhile (/= '/') $ p
+    takeDirectory = reverse . drop 1 . dropWhile (/= '/') . reverse

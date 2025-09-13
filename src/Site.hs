@@ -73,7 +73,7 @@ rules mode = do
   -- 4) Per‑post asset directories copied verbatim next to the post.
   --    We only copy assets for posts included in this build mode.
   asset_ids <- getMatches "posts/*/**"
-  forM_ asset_ids $ \ident -> do
+  forM_ asset_ids $ \ident -> match (fromList [ident]) $ do
     meta <- readMainPostMeta ident
     if includeInBuild mode meta
       then do
