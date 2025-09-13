@@ -35,6 +35,10 @@ about how to think: moving is deciding to stop analyzing potential
 alternatives.  Placing the piece in its new position on the board is
 communication: telling one's opponent what one has decided.
 
+<blockquote class="pullquote-display"><p> Between the total clarity of
+knowledge and the total opacity of ignorance lies the computational
+murk.</p></blockquote>
+
 So what does a game of chess between realistic players look like?
 White spends some time thinking about moves and their consequences.
 If they're any good, Black is also spending that time thinking about
