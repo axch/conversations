@@ -1,12 +1,13 @@
 module AnimatedAnalysis (display) where
 
-import qualified Data.Map as M
+import Data.Text qualified as T
+import Data.Map qualified as M
 import Data.Maybe (fromMaybe)
 
 -- | Represents an equation in the analysis with its state and formatting
 data Equation = Equation
-  { eqBinding :: String
-  , eqValue :: String
+  { eqBinding :: T.Text
+  , eqValue :: T.Text
   , eqVisible :: Bool
   , eqActionable :: Bool
   , eqNewlyCreated :: Bool
@@ -15,32 +16,32 @@ data Equation = Equation
 
 -- | Represents a binding with its program point and possible values
 data Binding = Binding
-  { bindPoint :: String
-  , bindValues :: [String]
-  , bindAffects :: [String]
+  { bindPoint :: T.Text
+  , bindValues :: [T.Text]
+  , bindAffects :: [T.Text]
   } deriving (Show)
 
 -- | Analysis state containing equations and metadata
 data State = State
-  { stateData :: M.Map String Binding
+  { stateData :: M.Map T.Text Binding
   , stateResult :: [Equation]
-  , stateResIndexes :: M.Map String Int
-  , stateContext :: Maybe String
-  , stateLastName :: Maybe String
+  , stateResIndexes :: M.Map T.Text Int
+  , stateContext :: Maybe T.Text
+  , stateLastName :: Maybe T.Text
   } deriving (Show)
 
 -- | Commands that can be executed to modify the analysis state
-data Command 
-  = Create String
-  | Act String Command
-  | Act2 String Command Command
-  | Evaluate (Maybe String)
-  | Hiding [String] Command
-  | Depends String
+data Command
+  = Create T.Text
+  | Act T.Text Command
+  | Act2 T.Text Command Command
+  | Evaluate (Maybe T.Text)
+  | Hiding [T.Text] Command
+  | Depends T.Text
   deriving (Show)
 
 -- | Create a new equation with the given binding
-mkEquation :: String -> Bool -> Equation
+mkEquation :: T.Text -> Bool -> Equation
 mkEquation binding newlyCreated = Equation
   { eqBinding = binding
   , eqValue = "\\bot"
@@ -51,7 +52,7 @@ mkEquation binding newlyCreated = Equation
   }
 
 -- | Update an equation's value and newly_updated flag
-updateEquation :: Equation -> String -> Bool -> Equation
+updateEquation :: Equation -> T.Text -> Bool -> Equation
 updateEquation eq newValue newlyUpdated = eq
   { eqValue = newValue
   , eqActionable = False
@@ -59,24 +60,24 @@ updateEquation eq newValue newlyUpdated = eq
   }
 
 -- | Render an equation as LaTeX
-renderEquation :: Equation -> String
+renderEquation :: Equation -> T.Text
 renderEquation eq = bindingR <> " & " <> mapstoR <> " & " <> valueR
   where
     bindingR
       | eqActionable eq = "\\bbox[color:orange]{" <> eqBinding eq <> "}"
       | eqNewlyCreated eq = "\\bbox[color:green]{" <> eqBinding eq <> "}"
       | otherwise = eqBinding eq
-    
+
     mapstoR
       | eqNewlyCreated eq = "\\bbox[color:green]{\\mapsto}"
       | otherwise = "\\mapsto"
-    
+
     valueR
       | eqNewlyCreated eq || eqNewlyUpdated eq = "\\bbox[color:green]{" <> eqValue eq <> "}"
       | otherwise = eqValue eq
 
 -- | Initial data bindings (from Ruby @data hash)
-initialData :: M.Map String Binding
+initialData :: M.Map T.Text Binding
 initialData = M.fromList
   [ ("mandel_expr", Binding "\\exp{(iterate (real 400) (step c) c:0)}, \\env{1}" ["\\RR"] [])
   , ("iterate_var1", Binding "\\exp{iterate}, \\env{1}" ["\\obj{iterate}"] [])
@@ -104,7 +105,7 @@ initialData = M.fromList
 
 -- | Command sequence (from Ruby @commands array)
 commands :: [Command]
-commands = 
+commands =
   [ Create "mandel_expr"
   , Act "mandel_expr" (Create "iterate_var1")
   , Evaluate Nothing
@@ -166,16 +167,16 @@ initialState = State
 executeCommand :: Bool -> State -> Command -> State
 executeCommand firstLight state cmd = case cmd of
   Create name -> createBinding firstLight name state
-  Act name subCmd -> actOnBinding firstLight name subCmd state  
+  Act name subCmd -> actOnBinding firstLight name subCmd state
   Act2 name cmd1 cmd2 -> actOnBinding firstLight name cmd2 (actOnBinding firstLight name cmd1 state)
-  Evaluate mName -> evaluateBinding firstLight (fromMaybe (fromMaybe "" (stateLastName state)) mName) state
+  Evaluate mName -> evaluateBinding firstLight (fromMaybe (fromMaybe T.empty (stateLastName state)) mName) state
   Hiding names subCmd -> hideBindings names (executeCommand firstLight state subCmd)
   Depends name -> dependsOnContext name state
 
 -- | Create a new binding equation
-createBinding :: Bool -> String -> State -> State
-createBinding firstLight name state = 
-  let binding = M.findWithDefault (Binding "" [] []) name (stateData state)
+createBinding :: Bool -> T.Text -> State -> State
+createBinding firstLight name state =
+  let binding = M.findWithDefault (Binding T.empty [] []) name (stateData state)
       newEq = mkEquation (bindPoint binding) firstLight
       newIndex = length (stateResult state)
       newState = state
@@ -188,11 +189,11 @@ createBinding firstLight name state =
        Nothing -> newState
 
 -- | Act on a binding (make it non-actionable and execute subcommand)
-actOnBinding :: Bool -> String -> Command -> State -> State
+actOnBinding :: Bool -> T.Text -> Command -> State -> State
 actOnBinding firstLight name subCmd state =
   let maybeIdx = M.lookup name (stateResIndexes state)
   in case maybeIdx of
-       Just idx -> 
+       Just idx ->
          let oldEq = stateResult state !! idx
              newEq = oldEq { eqActionable = False }
              newResult = take idx (stateResult state) ++ [newEq] ++ drop (idx + 1) (stateResult state)
@@ -202,7 +203,7 @@ actOnBinding firstLight name subCmd state =
        Nothing -> state
 
 -- | Evaluate a binding (update its value)
-evaluateBinding :: Bool -> String -> State -> State  
+evaluateBinding :: Bool -> T.Text -> State -> State
 evaluateBinding firstLight name state =
   let maybeIdx = M.lookup name (stateResIndexes state)
       maybeBinding = M.lookup name (stateData state)
@@ -228,19 +229,19 @@ evaluateBinding firstLight name state =
        _ -> state
 
 -- | Make affected bindings actionable
-makeAffectedActionable :: [String] -> State -> [Equation] -> [Equation]
-makeAffectedActionable affects state result = 
+makeAffectedActionable :: [T.Text] -> State -> [Equation] -> [Equation]
+makeAffectedActionable affects state result =
   foldr (\name acc -> case M.lookup name (stateResIndexes state) of
-                        Just idx | idx < length acc -> 
+                        Just idx | idx < length acc ->
                           let eq = acc !! idx
                               newEq = eq { eqActionable = True }
                           in take idx acc ++ [newEq] ++ drop (idx + 1) acc
                         _ -> acc) result affects
 
 -- | Hide specified bindings
-hideBindings :: [String] -> State -> State
+hideBindings :: [T.Text] -> State -> State
 hideBindings names state =
-  let newResult = map (\eq -> 
+  let newResult = map (\eq ->
         if any (\name -> case M.lookup name (stateResIndexes state) of
                            Just idx -> stateResult state !! idx == eq
                            Nothing -> False) names
@@ -249,33 +250,33 @@ hideBindings names state =
   in state { stateResult = newResult }
 
 -- | Add dependency relationship
-addDependency :: String -> String -> State -> State
+addDependency :: T.Text -> T.Text -> State -> State
 addDependency name ctxName state =
   case M.lookup ctxName (stateData state) of
-    Just binding -> 
+    Just binding ->
       let updatedBinding = binding { bindAffects = bindAffects binding ++ [name] }
           newData = M.insert ctxName updatedBinding (stateData state)
       in state { stateData = newData }
     Nothing -> state
 
 -- | Add dependency (used by Depends command)
-dependsOnContext :: String -> State -> State  
+dependsOnContext :: T.Text -> State -> State
 dependsOnContext name state = case stateContext state of
   Just ctx -> addDependency ctx name state
   Nothing -> state
 
 -- | Execute commands up to step i and return final state
 computeState :: Int -> State
-computeState i = 
+computeState i =
   let validCommands = take (i + 1) commands
       firstLight = True -- Simplified: always treat as first light
   in foldl (executeCommand firstLight) initialState validCommands
 
 -- | Display the analysis state at step i as LaTeX
-display :: Int -> String
-display i = 
+display :: Int -> T.Text
+display i =
   let state = computeState i
       visibleEqs = filter eqVisible (stateResult state)
       renderedEqs = map renderEquation visibleEqs
-      eqnArray = unlines renderedEqs
-  in "\\[\\begin{eqnarray*}\n" ++ concatMap (++ " \\\\\n") renderedEqs ++ "\\end{eqnarray*}\\]\n"
+      eqnLines = map (<> " \\\\\n") renderedEqs
+  in "\\[\\begin{eqnarray*}\n" <> T.concat eqnLines <> "\\end{eqnarray*}\\]\n"
