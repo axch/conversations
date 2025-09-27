@@ -70,211 +70,8 @@
 </head>
 <body>
 <div class="entry-content">
-<%
-class Equation
-  attr_accessor :value, :visible
-  attr_writer :actionable
-  def initialize(binding, newly_created = false)
-    @binding = binding
-    @value = '\bot'
-    @actionable = true
-    @visible = true
-    @newly_created = newly_created
-    @newly_updated = false
-  end
-  def updated(newly_updated)
-    @newly_updated = newly_updated
-  end
-  def render
-    "#{bindingR} & #{mapstoR} & #{valueR}"
-  end
-  private
-  def bindingR
-    if @actionable
-      "\\bbox[color:orange]{#{@binding}}"
-    elsif @newly_created
-      "\\bbox[color:green]{#{@binding}}"
-    else
-      @binding
-    end
-  end
-  def mapstoR
-    if @newly_created
-      "\\bbox[color:green]{\\mapsto}"
-    else
-      "\\mapsto"
-    end
-  end
-  def valueR
-    if @newly_created || @newly_updated
-      "\\bbox[color:green]{#{@value}}"
-    else
-      @value
-    end
-  end
-end
-
-class Binding
-  def initialize(point, values)
-    @point = point
-    @values = values
-    @affects = []
-  end
-  attr_reader :point
-  attr_accessor :values, :affects
-end
-
-class State
-  @@last_displayed = -1
-  def initialize
-
-    @data = {
-    :mandel_expr => Binding.new('\exp{(iterate (real 400) (step c) c:0)}, \env{1}', ['\RR']),
-    :iterate_var1 => Binding.new('\exp{iterate}, \env{1}', ['\obj{iterate}']),
-    :real_expr => Binding.new('\exp{(real 400)}, \env{1}', ['\R']),
-    :real_var => Binding.new('\exp{real}, \env{1}', ['\obj{real}']),
-    :real_app => Binding.new('\obj{real}, 400', ['\R']),
-    :step_c_expr => Binding.new('\exp{(step c)}, \env{1}', ['\obj{closure1}']),
-    :step_var => Binding.new('\exp{step}, \env{1}', ['\obj{step}']),
-    :c_var => Binding.new('\exp{c}, \env{1}', ['\RR']),
-    :step_app => Binding.new('\obj{step}, \RR', ['\obj{closure1}']),
-    :czero_var => Binding.new('\exp{c:0}, \env{1}', ['\RR']),
-    :iterate_app => Binding.new('\obj{iterate}, \R, \obj{closure1}, \RR', ['\RR']),
-    :if_expr => Binding.new('\exp{(if ...)}, \env{2}', ['\RR', '\RR']),
-    :compare_expr => Binding.new('\exp{(<= count 0)}, \env{2}', ['\B']),
-    :count_var => Binding.new('\exp{count}, \env{2}', ['\R']),
-    :compare_app => Binding.new('\obj{<=}, \R, 0', ['\B']),
-    :x_var => Binding.new('\exp{x}, \env{2}', ['\RR']),
-    :iterate_expr => Binding.new('\exp{(iterate (- count 1) f (f x))}, \env{2}', ['\RR']),
-    :iterate_var2 => Binding.new('\exp{iterate}, \env{2}', ['\obj{iterate}']),
-    :sub_expr => Binding.new('\exp{(- count 1)}, \env{2}', ['\R']),
-    :f_var => Binding.new('\exp{f}, \env{2}', ['\obj{closure1}']),
-    :fx_exp => Binding.new('\exp{(f x)}, \env{2}', ['\RR']),
-    :closure_app => Binding.new('\obj{closure1}, \RR', ['\RR'])}
-
-    @commands = [
-    [:create, :mandel_expr],
-    [:act, :mandel_expr, [:create, :iterate_var1]],
-    [:evaluate],
-    [:act, :mandel_expr, [:create, :real_expr]],
-    [:act, :real_expr, [:create, :real_var]],
-    [:evaluate],
-    [:act, :real_expr, [:create, :real_app]],
-    [:evaluate],
-    [:evaluate, :real_expr],
-    [:hiding, [:real_var, :real_app], [:act, :mandel_expr, [:create, :step_c_expr]]],
-    [:act, :step_c_expr, [:create, :step_var]],
-    [:evaluate],
-    [:act, :step_c_expr, [:create, :c_var]],
-    [:evaluate],
-    [:act, :step_c_expr, [:create, :step_app]],
-    [:evaluate],
-    [:evaluate, :step_c_expr],
-    [:hiding, [:step_var, :c_var, :step_app], [:act, :mandel_expr, [:create, :czero_var]]],
-    [:evaluate],
-    [:act, :mandel_expr, [:create, :iterate_app]],
-    [:hiding, [:iterate_var1, :real_expr, :step_c_expr, :czero_var], [:act, :iterate_app, [:create, :if_expr]]],
-    [:act, :if_expr, [:create, :compare_expr]],
-    [:act, :compare_expr, [:create, :count_var]],
-    [:evaluate],
-    [:act, :compare_expr, [:create, :compare_app]],
-    [:evaluate],
-    [:evaluate, :compare_expr],
-    [:hiding, [:count_var, :compare_app], [:act2, :if_expr, [:create, :x_var], [:create, :iterate_expr]]],
-    [:evaluate, :x_var],
-    [:act, :iterate_expr, [:create, :iterate_var2]],
-    [:evaluate],
-    [:act, :iterate_expr, [:create, :sub_expr]],
-    [:evaluate],
-    [:act, :iterate_expr, [:create, :f_var]],
-    [:evaluate],
-    [:act, :iterate_expr, [:create, :fx_exp]],
-    [:act, :fx_exp, [:create, :closure_app]],
-    [:evaluate],
-    [:evaluate, :fx_exp],
-    [:hiding, [:closure_app], [:act, :iterate_expr, [:depends, :iterate_app]]],
-    [:hiding, [:iterate_var2, :sub_expr, :f_var, :fx_exp],
-              [:evaluate, :if_expr]],
-    [:evaluate, :iterate_app],
-    [:evaluate, :iterate_expr],
-    [:evaluate, :if_expr],
-    [:evaluate, :mandel_expr]]
-
-    @result = []
-    @res_indexes = {}
-    @context = nil
-  end
-
-  def act(name, cmd)
-    @result[@res_indexes[name]].actionable = false
-    @context = name
-    self.send(*cmd)
-    @context = nil
-  end
-
-  def act2(name, cmd1, cmd2)
-    act(name, cmd1)
-    act(name, cmd2)
-  end
-
-  def create(name)
-    @res_indexes[name] = result.length
-    @result.push(Equation.new(@data[name].point, @first_light))
-    if @context
-      depends(name)
-    end
-    @last_name = name
-  end
-
-  def evaluate(name = @last_name)
-    old = @result[@res_indexes[name]].value
-    new = @data[name].values[0]
-    @result[@res_indexes[name]].actionable = false
-    if (old != new)
-      @result[@res_indexes[name]].value = new
-      @result[@res_indexes[name]].updated @first_light
-      @data[name].affects.each do |n|
-        @result[@res_indexes[n]].actionable = true
-      end
-    end
-    @data[name].values = @data[name].values[1..-1]
-  end
-
-  def hiding(what, cmd)
-    what.each do |name|
-      @result[@res_indexes[name]].visible = false
-    end
-    self.send(*cmd)
-  end
-
-  def depends(name)
-    @data[name].affects.push(@context)
-  end
-
-  def execute(i)
-    @first_light = (i > @@last_displayed)
-    self.send(*@commands[i])
-  end
-
-  def self.state(i)
-    answer = State.new
-    (i+1).times do |i|
-      answer.execute(i)
-    end
-    @@last_displayed = i
-    answer
-  end
-  attr_reader :result
-end
-
-def display(i)
-  '\[\begin{eqnarray*}' + "\n" +
-    State.state(i).result.select { |eq| eq.visible }.map { |eq| eq.render }.join(" \\\\\n") +
-    "\n" + '\end{eqnarray*}\]' + "\n"
-end
-%>
 <section class="slide level6" id="section">
-<%= display(0) %>
+<!--DISPLAY:0-->
 <p>I start the example in the middle of analyzing the
 Mandelbrot program, so as to focus on the two interesting phenomena of
 recursion and higher-order functions.</p>
@@ -290,7 +87,7 @@ not yet known to return anything.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(1) %>
+<!--DISPLAY:1-->
 <p>In order to get anywhere with our original expression, we first
 need to evaluate the symbol <code>iterate</code> in the appropriate
 environment, so we add that expression to the analysis structure.  It
@@ -300,7 +97,7 @@ it knows something about <code>iterate</code>.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(2) %>
+<!--DISPLAY:2-->
 <p>Of course, <code>iterate</code> is bound in our environment to the
 closure representing the <code>iterate</code> procedure.  On
 discovering this, we update the value of that program point; since
@@ -310,7 +107,7 @@ brackets to distinguish them from expressions.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(3) %>
+<!--DISPLAY:3-->
 <p>The next subexpression of the <code>(iterate ...)</code> expression also needs to be
 evaluated.</p>
 <p>Here is one place where it matters that the language we
@@ -320,23 +117,23 @@ they are ever invoked.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(4) %>
+<!--DISPLAY:4-->
 <p>For <code>(real 400)</code> we first need <code>real</code>...</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(5) %>
+<!--DISPLAY:5-->
 <p>... which is a (primitive) procedure.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(6) %>
+<!--DISPLAY:6-->
 <p><code>400</code> evaluates to itself, so now we get to apply
 the <code>real</code> primitive to it.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(7) %>
+<!--DISPLAY:7-->
 <p>At runtime, the <code>real</code> procedure is the identity
 function, so in fact applying <code>real</code> to 400 will always
 produce 400.  If, however, the flow analysis were that precise, the
@@ -355,7 +152,7 @@ program point should be treated as producing arbitrary (scalar) numbers.
 </section>
 
 <section class="slide level6" id="section">
-<%= display(8) %>
+<!--DISPLAY:8-->
 <p>The expression <code>(real 400)</code> always returns the same
 thing as the application of <code>real</code> to 400, which we already
 deduced was \(\R\), so we are now ready to continue with the original
@@ -363,7 +160,7 @@ deduced was \(\R\), so we are now ready to continue with the original
 </section>
 
 <section class="slide level6" id="section">
-<%= display(16) %>
+<!--DISPLAY:16-->
 <p>The <code>(step c)</code> subexpression is evaluated much the same
 way.  I skip that in the interest of brevity; I also skip how the
 application of the compound procedure <code>step</code> to the
@@ -382,7 +179,7 @@ all the time.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(19) %>
+<!--DISPLAY:19-->
 <p>The analysis of the variable <code>c:0</code> is also
 straightforward, so now we are ready to analyze the call to the
 <code>iterate</code> procedure on (the abstract values representing)
@@ -390,7 +187,7 @@ its arguments.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(20) %>
+<!--DISPLAY:20-->
 <p>Analyzing a call to a compound procedure is like evaluating it:
 analyze the evaluation of the procedure's body (here, the
 large <code>(if ...)</code> expression) in the (abstract) environment
@@ -402,23 +199,23 @@ cost on compilation time.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(21) %>
+<!--DISPLAY:21-->
 <p>To analyze an <code>if</code>, first analyze the condition.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(23) %>
+<!--DISPLAY:23-->
 <p>The <code>count</code> argument was an arbitrary real number (not 400!)</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(26) %>
+<!--DISPLAY:26-->
 <p>An arbitrary real number may be greater or smaller than zero, so
 the comparison must be assumed to return an arbitrary boolean.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(27) %>
+<!--DISPLAY:27-->
 <p>If the value of the condition had been statically known, we
 could proceed down the appropriate branch of the <code>if</code>, as a
 normal evaluator would.  Given that it is not, we will need to analyze
@@ -428,7 +225,7 @@ known, so alternatives need to be considered.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(28) %>
+<!--DISPLAY:28-->
 <p>Evaluating the "then" branch of our <code>if</code> is pretty easy.
 Given that we learned something about what the branches of
 the <code>if</code> do, the <code>(if ...)</code> expression itself is
@@ -438,7 +235,7 @@ before the abstract evaluator returns to the <code>(if ...)</code>.
 </section>
 
 <section class="slide level6" id="section">
-<%= display(38) %>
+<!--DISPLAY:38-->
 <p>Said second branch of the <code>if</code> is another complicated
 expression, whose subexpressions get analyzed one at a time.  Neither
 the play-by-play here nor the analysis of how the body
@@ -448,7 +245,7 @@ is treated as returning \(\R\), not 399.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(39) %>
+<!--DISPLAY:39-->
 <p>What is of interest is that the recursive <code>(iterate
 ...)</code>  call has the shape
 \(\obj{iterate}, \R, \obj{closure1}, \RR\),
@@ -461,7 +258,7 @@ done.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(40) %>
+<!--DISPLAY:40-->
 <p>Now the abstract evaluator has no choice but to update its idea of
 what the <code>(if ...)</code> expression returns.  Because
 the <code>(if ...)</code> is known to go both ways, and one branch is
@@ -491,13 +288,13 @@ precise solution of the equations that enforce soundness.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(41) %>
+<!--DISPLAY:41-->
 <p>Continuing, the value we deduced for <code>(if ...)</code> propagates, allowing
 us to update the calls to <code>iterate</code> in either order.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(42) %>
+<!--DISPLAY:42-->
 <p>Let's do the interesting one first.  The recursive call
 to <code>iterate</code> was a branch of the <code>(if ...)</code>,
 which thus becomes actionable again because we discovered something its
@@ -505,7 +302,7 @@ value may depend upon.</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(43) %>
+<!--DISPLAY:43-->
 <p>However, an <code>(if ...)</code> either of whose branches returns
 \(\RR\) itself still returns \(\RR\), so re-examining it does not lead
 to new insight.  Importantly, that means the <code>(if ...)</code>
@@ -513,7 +310,7 @@ expression's dependencies do not become actionable...</p>
 </section>
 
 <section class="slide level6" id="section">
-<%= display(44) %>
+<!--DISPLAY:44-->
 <p>... and it is possible for the abstract evaluation to finish (with this
 segment of code).</p>
 </section>

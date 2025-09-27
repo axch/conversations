@@ -23,6 +23,7 @@ import Types
 import Routes
 import Context
 import Templates
+import AnimatedAnalysis qualified as Analysis
 
 main :: IO ()
 main = do
@@ -70,6 +71,14 @@ rules mode = do
     route $ postRoute mode
 
     compile $ getResourceBody >>= postCompile
+
+  -- 4a) Special handling for the slide show in Cleverness of Compilers 2
+  -- Don't bother checking for publication, because the post is published.
+  match "posts/2013-08-22-cleverness-of-compilers/animated-analysis.html" $ do
+    route $ postAssetRoute
+    compile $ do
+      body <- getResourceString
+      makeItem (T.unpack $ resolveDisplayComments Analysis.display (T.pack $ itemBody body)) >>= relativizeUrls
 
   -- 4) Per‑post asset directories copied verbatim next to the post.
   --    We only copy assets for posts included in this build mode.
