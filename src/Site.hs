@@ -74,7 +74,7 @@ rules mode = do
 
   -- 4a) Special handling for the slide show in Cleverness of Compilers 2
   -- Don't bother checking for publication, because the post is published.
-  match "posts/2013-08-22-cleverness-of-compilers/animated-analysis.html" $ do
+  match "posts/2013-10-10-cleverness-of-compilers-2-how/animated-analysis.html" $ do
     route $ postAssetRoute
     compile $ do
       body <- getResourceString
