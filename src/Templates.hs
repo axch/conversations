@@ -1,5 +1,5 @@
 module Templates
-  ( PostCard(..), archivePageHtml
+  ( PostCard(..), archivePageHtml, resolveDisplayComments
   ) where
 
 -- We use Lucid to render the archive page’s inner HTML. This gives you a nice
@@ -8,6 +8,7 @@ module Templates
 import Lucid
 import Data.List (intersperse)
 import Data.Text qualified as T
+import Data.Text.Read qualified as TR
 
 -- | Minimal post card for the archive. You'll iterate on this later.
 data PostCard = PostCard
@@ -64,3 +65,17 @@ archivePageHtml page total posts = do
     pageA p n
       | n == p    = span_ [class_ "current"] (toHtml $ show n)
       | otherwise = span_ $ a_ [href_ (if n == 1 then "/" else T.pack ("/" <> show n <> "/"))] (toHtml $ show n)
+
+resolveDisplayComments :: (Int -> T.Text) -> T.Text -> T.Text
+resolveDisplayComments display input =
+  case T.breakOn "<!--DISPLAY:" input of
+    (prefix, rest)
+      | T.null rest -> prefix
+      | otherwise   ->
+          let afterMarker = T.drop (T.length "<!--DISPLAY:") rest
+              (numTxt, rest2) = T.breakOn "-->" afterMarker
+          in case TR.decimal (T.strip numTxt) of
+               Right (n, _) ->
+                 let afterClose = T.drop (T.length "-->") rest2
+                 in prefix <> display n <> resolveDisplayComments display afterClose
+               Left _ -> prefix <> "<!--DISPLAY:" <> resolveDisplayComments display afterMarker
