@@ -316,27 +316,31 @@ segment of code).</p>
 </section>
 </div>
 
-<script type="text/javascript"
-   src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-<script type="text/javascript">
-MathJax.Hub.Config({
-  TeX: {
-    Macros: {
-      R: "{\\mathbb{R}}",
-      B: "{\\mathbb{B}}",
-      RR: "(\\R\\ . \\R)",
-      eps: "\\varepsilon",
-      exp: ["{\\textrm{#1}}",1],
-      env: ["{\\textrm{env#1}}",1],
-      obj: ["{\\left<\\textrm{#1}\\right>}",1],
+<!-- SVG output, to avoid zero-height spans -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config({
+    jax: ["input/TeX","output/SVG"],
+    extensions: ["tex2jax.js","MathMenu.js","MathZoom.js"],
+    TeX: {
+      extensions: ["AMSmath.js","AMSsymbols.js","bbox.js"],
+      Macros: {
+        R: "{\\mathbb{R}}",
+        B: "{\\mathbb{B}}",
+        RR: "(\\R\\ . \\R)",
+        eps: "\\varepsilon",
+        exp: ["{\\textrm{#1}}",1],
+        env: ["{\\textrm{env#1}}",1],
+        obj: ["{\\left<\\textrm{#1}\\right>}",1],
+      },
+      equationNumbers: { autoNumber: "AMS" },
+      noErrors: { disabled: true },
     },
-    equationNumbers: { autoNumber: "AMS" },
-    noErrors: { disabled: true },
-  },
-  displayAlign: "left",
-  displayIndent: "2.7"
-});
+    SVG: { font: "TeX", mtextFontInherit: true },  // keeps text font consistent
+    displayAlign: "left",
+    displayIndent: "2.7"
+  });
 </script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS_SVG"></script>
 
 <style>
 /* Modified by axch to suit the local purpose */
@@ -346,6 +350,22 @@ body {
   margin-top: -275px !important;
   margin-left: -270px !important;
 }
+</style>
+
+<style>
+/* Neutralize MathJax’s computed left shift for display math */
+.MathJax_Display .MathJax,
+.MathJax_SVG_Display svg {
+  margin-left: 3em !important;
+  margin-right: 0 !important; /* just in case */
+}
+/* Safety: ensure display math isn’t re-centered by parent */
+.MathJax_Display,
+.MathJax_SVG_Display {
+  text-align: left !important;
+}
+/* Hide lingering previews if cleanup is skipped */
+.MathJax_Preview { display: none !important; }
 </style>
 
 <!-- {{{{ dzslides core

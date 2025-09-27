@@ -279,4 +279,4 @@ display i =
       visibleEqs = filter eqVisible (stateResult state)
       renderedEqs = map renderEquation visibleEqs
       eqnLines = map (<> " \\\\\n") renderedEqs
-  in "\\[\\begin{eqnarray*}\n" <> T.concat eqnLines <> "\\end{eqnarray*}\\]\n"
+  in "\\[\\begin{aligned}\n" <> T.concat eqnLines <> "\\end{aligned}\\]\n"
