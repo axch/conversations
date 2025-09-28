@@ -70,7 +70,7 @@
 </head>
 <body>
 <div class="entry-content">
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-00">
 <!--DISPLAY:0-->
 <p>I start the example in the middle of analyzing the
 Mandelbrot program, so as to focus on the two interesting phenomena of
@@ -86,7 +86,7 @@ is \(\bot\), representing the empty set, because this expression is
 not yet known to return anything.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-01">
 <!--DISPLAY:1-->
 <p>In order to get anywhere with our original expression, we first
 need to evaluate the symbol <code>iterate</code> in the appropriate
@@ -96,7 +96,7 @@ expression is now stuck&mdash;the analysis will not make progress on it until
 it knows something about <code>iterate</code>.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-02">
 <!--DISPLAY:2-->
 <p>Of course, <code>iterate</code> is bound in our environment to the
 closure representing the <code>iterate</code> procedure.  On
@@ -106,7 +106,7 @@ fruitful to interpret further.  Note: I enclose procedure objects in
 brackets to distinguish them from expressions.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-03">
 <!--DISPLAY:3-->
 <p>The next subexpression of the <code>(iterate ...)</code> expression also needs to be
 evaluated.</p>
@@ -116,23 +116,23 @@ thunks and analyzing the body of <code>iterate</code> to see whether
 they are ever invoked.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-04">
 <!--DISPLAY:4-->
 <p>For <code>(real 400)</code> we first need <code>real</code>...</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-05">
 <!--DISPLAY:5-->
 <p>... which is a (primitive) procedure.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-06">
 <!--DISPLAY:6-->
 <p><code>400</code> evaluates to itself, so now we get to apply
 the <code>real</code> primitive to it.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-07">
 <!--DISPLAY:7-->
 <p>At runtime, the <code>real</code> procedure is the identity
 function, so in fact applying <code>real</code> to 400 will always
@@ -151,7 +151,7 @@ even when its input is actually statically known.  That's what that
 program point should be treated as producing arbitrary (scalar) numbers.
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-08">
 <!--DISPLAY:8-->
 <p>The expression <code>(real 400)</code> always returns the same
 thing as the application of <code>real</code> to 400, which we already
@@ -159,7 +159,7 @@ deduced was \(\R\), so we are now ready to continue with the original
 <code>(iterate ...)</code> expression.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-16">
 <!--DISPLAY:16-->
 <p>The <code>(step c)</code> subexpression is evaluated much the same
 way.  I skip that in the interest of brevity; I also skip how the
@@ -178,7 +178,7 @@ there in the abstract evaluator, but we do not need to look at them
 all the time.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-19">
 <!--DISPLAY:19-->
 <p>The analysis of the variable <code>c:0</code> is also
 straightforward, so now we are ready to analyze the call to the
@@ -186,7 +186,7 @@ straightforward, so now we are ready to analyze the call to the
 its arguments.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-20">
 <!--DISPLAY:20-->
 <p>Analyzing a call to a compound procedure is like evaluating it:
 analyze the evaluation of the procedure's body (here, the
@@ -198,23 +198,23 @@ flow analysis its specializing power, and also exacts the
 cost on compilation time.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-21">
 <!--DISPLAY:21-->
 <p>To analyze an <code>if</code>, first analyze the condition.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-23">
 <!--DISPLAY:23-->
 <p>The <code>count</code> argument was an arbitrary real number (not 400!)</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-26">
 <!--DISPLAY:26-->
 <p>An arbitrary real number may be greater or smaller than zero, so
 the comparison must be assumed to return an arbitrary boolean.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-27">
 <!--DISPLAY:27-->
 <p>If the value of the condition had been statically known, we
 could proceed down the appropriate branch of the <code>if</code>, as a
@@ -224,7 +224,7 @@ evaluation and concrete evaluation: The flow of control is not fully
 known, so alternatives need to be considered.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-28">
 <!--DISPLAY:28-->
 <p>Evaluating the "then" branch of our <code>if</code> is pretty easy.
 Given that we learned something about what the branches of
@@ -234,7 +234,7 @@ deterministic, but let's assume that the second branch gets explored
 before the abstract evaluator returns to the <code>(if ...)</code>.
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-38">
 <!--DISPLAY:38-->
 <p>Said second branch of the <code>if</code> is another complicated
 expression, whose subexpressions get analyzed one at a time.  Neither
@@ -244,7 +244,7 @@ is of any great interest; but note that <code>(- count 1)</code>
 is treated as returning \(\R\), not 399.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-39">
 <!--DISPLAY:39-->
 <p>What is of interest is that the recursive <code>(iterate
 ...)</code>  call has the shape
@@ -257,7 +257,7 @@ one: it remembers the history and doesn't repeat work it has already
 done.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-40">
 <!--DISPLAY:40-->
 <p>Now the abstract evaluator has no choice but to update its idea of
 what the <code>(if ...)</code> expression returns.  Because
@@ -268,7 +268,7 @@ other branch is not yet known to return at all.  So we update the
 abstract value for <code>(if ...)</code> to \(\RR\).</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-40b">
 <p></p>
 <p>There is a subtle point to the handling of conditionals and recursion we just saw.
 It is important here that the abstract analysis
@@ -287,13 +287,13 @@ anything.  We would have found the least precise rather than the most
 precise solution of the equations that enforce soundness.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-41">
 <!--DISPLAY:41-->
 <p>Continuing, the value we deduced for <code>(if ...)</code> propagates, allowing
 us to update the calls to <code>iterate</code> in either order.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-42">
 <!--DISPLAY:42-->
 <p>Let's do the interesting one first.  The recursive call
 to <code>iterate</code> was a branch of the <code>(if ...)</code>,
@@ -301,7 +301,7 @@ which thus becomes actionable again because we discovered something its
 value may depend upon.</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-43">
 <!--DISPLAY:43-->
 <p>However, an <code>(if ...)</code> either of whose branches returns
 \(\RR\) itself still returns \(\RR\), so re-examining it does not lead
@@ -309,7 +309,7 @@ to new insight.  Importantly, that means the <code>(if ...)</code>
 expression's dependencies do not become actionable...</p>
 </section>
 
-<section class="slide level6" id="section">
+<section class="slide level6" id="section-44">
 <!--DISPLAY:44-->
 <p>... and it is possible for the abstract evaluation to finish (with this
 segment of code).</p>
