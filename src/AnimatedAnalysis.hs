@@ -18,8 +18,8 @@ data Equation = Equation
   , eqValue :: T.Text
   , eqVisible :: Bool
   , eqActionable :: Bool
-  , eqNewlyCreated :: Bool
-  , eqNewlyUpdated :: Bool
+  , eqCreatedAt :: Int
+  , eqLastUpdatedAt :: Maybe Int
   } deriving (Show, Eq)
 
 -- | Represents a binding with its program point and possible values
@@ -36,8 +36,6 @@ data State = State
   , stateResIndexes :: M.Map BindingName Int
   , stateContext :: Maybe BindingName
   , stateLastName :: Maybe BindingName
-  , stateCreatedAt :: M.Map Int Int  -- equation index -> step created
-  , stateUpdatedAt :: M.Map Int Int  -- equation index -> step last updated
   } deriving (Show)
 
 -- | Commands that can be executed to modify the analysis state
@@ -51,39 +49,44 @@ data Command
   deriving (Show)
 
 -- | Create a new equation with the given binding
-mkEquation :: T.Text -> Bool -> Equation
-mkEquation binding newlyCreated = Equation
+mkEquation :: T.Text -> Int -> Equation
+mkEquation binding createdAt = Equation
   { eqBinding = binding
   , eqValue = "\\bot"
   , eqVisible = True
   , eqActionable = True
-  , eqNewlyCreated = newlyCreated
-  , eqNewlyUpdated = False
+  , eqCreatedAt = createdAt
+  , eqLastUpdatedAt = Nothing
   }
 
--- | Update an equation's value and newly_updated flag
-updateEquation :: Equation -> T.Text -> Bool -> Equation
-updateEquation eq newValue newlyUpdated = eq
+-- | Update an equation's value and last updated timestamp
+updateEquation :: Equation -> T.Text -> Int -> Equation
+updateEquation eq newValue updatedAt = eq
   { eqValue = newValue
   , eqActionable = False
-  , eqNewlyUpdated = newlyUpdated
+  , eqLastUpdatedAt = Just updatedAt
   }
 
 -- | Render an equation as LaTeX
-renderEquation :: Equation -> T.Text
-renderEquation eq = bindingR <> " & " <> mapstoR <> " & " <> valueR
+renderEquation :: Int -> Equation -> T.Text
+renderEquation lastDisplayed eq = bindingR <> " & " <> mapstoR <> " & " <> valueR
   where
+    newlyCreated = eqCreatedAt eq > lastDisplayed
+    newlyUpdated = case eqLastUpdatedAt eq of
+                     Just updatedAt -> updatedAt > lastDisplayed
+                     Nothing -> False
+
     bindingR
       | eqActionable eq = "\\bbox[color:orange]{" <> eqBinding eq <> "}"
-      | eqNewlyCreated eq = "\\bbox[color:green]{" <> eqBinding eq <> "}"
+      | newlyCreated = "\\bbox[color:green]{" <> eqBinding eq <> "}"
       | otherwise = eqBinding eq
 
     mapstoR
-      | eqNewlyCreated eq = "\\bbox[color:green]{\\mapsto}"
+      | newlyCreated = "\\bbox[color:green]{\\mapsto}"
       | otherwise = "\\mapsto"
 
     valueR
-      | eqNewlyCreated eq || eqNewlyUpdated eq = "\\bbox[color:green]{" <> eqValue eq <> "}"
+      | newlyCreated || newlyUpdated = "\\bbox[color:green]{" <> eqValue eq <> "}"
       | otherwise = eqValue eq
 
 -- | Initial data bindings (from Ruby @data hash)
@@ -171,39 +174,36 @@ initialState = State
   , stateResIndexes = M.empty
   , stateContext = Nothing
   , stateLastName = Nothing
-  , stateCreatedAt = M.empty
-  , stateUpdatedAt = M.empty
   }
 
 -- | Execute a single command on the state
-executeCommand :: Int -> Bool -> State -> Command -> State
-executeCommand step firstLight state cmd = case cmd of
-  Create name -> createBinding step firstLight name state
-  Act name subCmd -> actOnBinding step firstLight name subCmd state
-  Act2 name cmd1 cmd2 -> actOnBinding step firstLight name cmd2 (actOnBinding step firstLight name cmd1 state)
-  Evaluate mName -> evaluateBinding step firstLight (fromMaybe (fromMaybe "" (stateLastName state)) mName) state
-  Hiding names subCmd -> hideBindings names (executeCommand step firstLight state subCmd)
+executeCommand :: Int -> State -> Command -> State
+executeCommand step state cmd = case cmd of
+  Create name -> createBinding step name state
+  Act name subCmd -> actOnBinding step name subCmd state
+  Act2 name cmd1 cmd2 -> actOnBinding step name cmd2 (actOnBinding step name cmd1 state)
+  Evaluate mName -> evaluateBinding step (fromMaybe (fromMaybe "" (stateLastName state)) mName) state
+  Hiding names subCmd -> hideBindings names (executeCommand step state subCmd)
   Depends name -> dependsOnContext name state
 
 -- | Create a new binding equation
-createBinding :: Int -> Bool -> BindingName -> State -> State
-createBinding step firstLight name state =
+createBinding :: Int -> BindingName -> State -> State
+createBinding step name state =
   let binding = M.findWithDefault (Binding T.empty [] []) name (stateData state)
-      newEq = mkEquation (bindPoint binding) firstLight
+      newEq = mkEquation (bindPoint binding) step
       newIndex = length (stateResult state)
       newState = state
         { stateResult = stateResult state ++ [newEq]
         , stateResIndexes = M.insert name newIndex (stateResIndexes state)
         , stateLastName = Just name
-        , stateCreatedAt = M.insert newIndex step (stateCreatedAt state)
         }
   in case stateContext state of
        Just ctx -> addDependency name ctx newState
        Nothing -> newState
 
 -- | Act on a binding (make it non-actionable and execute subcommand)
-actOnBinding :: Int -> Bool -> BindingName -> Command -> State -> State
-actOnBinding step firstLight name subCmd state =
+actOnBinding :: Int -> BindingName -> Command -> State -> State
+actOnBinding step name subCmd state =
   let maybeIdx = M.lookup name (stateResIndexes state)
   in case maybeIdx of
        Just idx ->
@@ -211,13 +211,13 @@ actOnBinding step firstLight name subCmd state =
              newEq = oldEq { eqActionable = False }
              newResult = take idx (stateResult state) ++ [newEq] ++ drop (idx + 1) (stateResult state)
              newState = state { stateResult = newResult, stateContext = Just name }
-             finalState = executeCommand step firstLight newState subCmd
+             finalState = executeCommand step newState subCmd
          in finalState { stateContext = Nothing }
        Nothing -> state
 
 -- | Evaluate a binding (update its value)
-evaluateBinding :: Int -> Bool -> BindingName -> State -> State
-evaluateBinding step firstLight name state =
+evaluateBinding :: Int -> BindingName -> State -> State
+evaluateBinding step name state =
   let maybeIdx = M.lookup name (stateResIndexes state)
       maybeBinding = M.lookup name (stateData state)
   in case (maybeIdx, maybeBinding) of
@@ -228,7 +228,7 @@ evaluateBinding step firstLight name state =
                           (v:_) -> v
                           [] -> oldValue
              newEq = if oldValue /= newValue
-                     then updateEquation oldEq newValue firstLight
+                     then updateEquation oldEq newValue step
                      else oldEq { eqActionable = False }
              newResult = take idx (stateResult state) ++ [newEq] ++ drop (idx + 1) (stateResult state)
              -- Update affected bindings to be actionable if value changed
@@ -238,11 +238,7 @@ evaluateBinding step firstLight name state =
              -- Remove first value from binding's values list
              updatedBinding = binding { bindValues = drop 1 (bindValues binding) }
              newData = M.insert name updatedBinding (stateData state)
-             -- Track when this equation was updated
-             newUpdatedAt = if oldValue /= newValue
-                           then M.insert idx step (stateUpdatedAt state)
-                           else stateUpdatedAt state
-         in state { stateResult = newResult2, stateData = newData, stateUpdatedAt = newUpdatedAt }
+         in state { stateResult = newResult2, stateData = newData }
        _ -> state
 
 -- | Make affected bindings actionable
@@ -297,10 +293,7 @@ getPreviousDisplayStep i =
 computeState :: Int -> State
 computeState targetStep =
   let validCommands = take (targetStep + 1) commands
-      lastDisplayed = getPreviousDisplayStep targetStep
-      -- Steps after lastDisplayed get first_light = true (simulating Ruby's @@last_displayed logic)
-      stepHasFirstLight step = step > lastDisplayed
-  in foldl (\state (step, cmd) -> executeCommand step (stepHasFirstLight step) state cmd)
+  in foldl (\state (step, cmd) -> executeCommand step state cmd)
            initialState
            (zip [0..] validCommands)
 
@@ -308,8 +301,9 @@ computeState targetStep =
 display :: Int -> T.Text
 display i =
   let finalState = computeState i
+      lastDisplayed = getPreviousDisplayStep i
       visibleEqs = filter eqVisible (stateResult finalState)
-      renderedEqs = map renderEquation visibleEqs
+      renderedEqs = map (renderEquation lastDisplayed) visibleEqs
       eqnLines = case renderedEqs of
                    [] -> []
                    [single] -> [single]
