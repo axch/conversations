@@ -168,20 +168,20 @@ initialState = State
   }
 
 -- | Execute a single command on the state
-executeCommand :: Int -> State -> Command -> State
-executeCommand step state cmd = case cmd of
-  Create name -> createBinding step name state
-  Act name subCmd -> actOnBinding step name subCmd state
-  Act2 name cmd1 cmd2 -> actOnBinding step name cmd2 (actOnBinding step name cmd1 state)
-  Evaluate mName -> evaluateBinding step (fromMaybe (fromMaybe T.empty (stateLastName state)) mName) state
-  Hiding names subCmd -> hideBindings names (executeCommand step state subCmd)
+executeCommand :: Int -> Bool -> State -> Command -> State
+executeCommand step firstLight state cmd = case cmd of
+  Create name -> createBinding step firstLight name state
+  Act name subCmd -> actOnBinding step firstLight name subCmd state
+  Act2 name cmd1 cmd2 -> actOnBinding step firstLight name cmd2 (actOnBinding step firstLight name cmd1 state)
+  Evaluate mName -> evaluateBinding step firstLight (fromMaybe (fromMaybe T.empty (stateLastName state)) mName) state
+  Hiding names subCmd -> hideBindings names (executeCommand step firstLight state subCmd)
   Depends name -> dependsOnContext name state
 
 -- | Create a new binding equation
-createBinding :: Int -> T.Text -> State -> State
-createBinding step name state =
+createBinding :: Int -> Bool -> T.Text -> State -> State
+createBinding step firstLight name state =
   let binding = M.findWithDefault (Binding T.empty [] []) name (stateData state)
-      newEq = mkEquation (bindPoint binding) False -- temporarily set to False
+      newEq = mkEquation (bindPoint binding) firstLight
       newIndex = length (stateResult state)
       newState = state
         { stateResult = stateResult state ++ [newEq]
@@ -194,8 +194,8 @@ createBinding step name state =
        Nothing -> newState
 
 -- | Act on a binding (make it non-actionable and execute subcommand)
-actOnBinding :: Int -> T.Text -> Command -> State -> State
-actOnBinding step name subCmd state =
+actOnBinding :: Int -> Bool -> T.Text -> Command -> State -> State
+actOnBinding step firstLight name subCmd state =
   let maybeIdx = M.lookup name (stateResIndexes state)
   in case maybeIdx of
        Just idx ->
@@ -203,13 +203,13 @@ actOnBinding step name subCmd state =
              newEq = oldEq { eqActionable = False }
              newResult = take idx (stateResult state) ++ [newEq] ++ drop (idx + 1) (stateResult state)
              newState = state { stateResult = newResult, stateContext = Just name }
-             finalState = executeCommand step newState subCmd
+             finalState = executeCommand step firstLight newState subCmd
          in finalState { stateContext = Nothing }
        Nothing -> state
 
 -- | Evaluate a binding (update its value)
-evaluateBinding :: Int -> T.Text -> State -> State
-evaluateBinding step name state =
+evaluateBinding :: Int -> Bool -> T.Text -> State -> State
+evaluateBinding step firstLight name state =
   let maybeIdx = M.lookup name (stateResIndexes state)
       maybeBinding = M.lookup name (stateData state)
   in case (maybeIdx, maybeBinding) of
@@ -220,7 +220,7 @@ evaluateBinding step name state =
                           (v:_) -> v
                           [] -> oldValue
              newEq = if oldValue /= newValue
-                     then updateEquation oldEq newValue False -- temporarily set to False
+                     then updateEquation oldEq newValue firstLight
                      else oldEq { eqActionable = False }
              newResult = take idx (stateResult state) ++ [newEq] ++ drop (idx + 1) (stateResult state)
              -- Update affected bindings to be actionable if value changed
@@ -258,47 +258,49 @@ hideBindings names state =
         else eq) (stateResult state)
   in state { stateResult = newResult }
 
--- | Add dependency relationship
+-- | Add dependency relationship - adds context to new binding's affects list
 addDependency :: T.Text -> T.Text -> State -> State
 addDependency name ctxName state =
-  case M.lookup ctxName (stateData state) of
+  case M.lookup name (stateData state) of
     Just binding ->
-      let updatedBinding = binding { bindAffects = bindAffects binding ++ [name] }
-          newData = M.insert ctxName updatedBinding (stateData state)
+      let updatedBinding = binding { bindAffects = bindAffects binding ++ [ctxName] }
+          newData = M.insert name updatedBinding (stateData state)
       in state { stateData = newData }
     Nothing -> state
 
 -- | Add dependency (used by Depends command)
 dependsOnContext :: T.Text -> State -> State
 dependsOnContext name state = case stateContext state of
-  Just ctx -> addDependency ctx name state
+  Just ctx -> addDependency name ctx state
   Nothing -> state
 
+-- | Sequence of display calls as they appear in the Ruby template
+displaySequence :: [Int]
+displaySequence = [0,1,2,3,4,5,6,7,8,16,19,20,21,23,26,27,28,38,39,40,41,42,43,44]
+
+-- | Get the previous display step for simulating @@last_displayed
+getPreviousDisplayStep :: Int -> Int
+getPreviousDisplayStep i =
+  case takeWhile (< i) displaySequence of
+    [] -> -1  -- Initial value of @@last_displayed
+    prev -> last prev
+
 -- | Execute commands up to step i and return final state
-computeState :: Int -> State
-computeState i =
+computeState :: Int -> Int -> State
+computeState targetStep i =
   let validCommands = take (i + 1) commands
-  in foldl (\state (step, cmd) -> executeCommand step state cmd)
+      lastDisplayed = getPreviousDisplayStep targetStep
+      -- Steps after lastDisplayed get first_light = true (simulating Ruby's @@last_displayed logic)
+      stepHasFirstLight step = step > lastDisplayed
+  in foldl (\state (step, cmd) -> executeCommand step (stepHasFirstLight step) state cmd)
            initialState
            (zip [0..] validCommands)
-
--- | Apply colorization flags based on what happened in the target step
-applyStepColorization :: Int -> State -> State
-applyStepColorization targetStep state =
-  let updatedResult = map (\(idx, eq) ->
-        let wasCreatedInStep = M.lookup idx (stateCreatedAt state) == Just targetStep
-            wasUpdatedInStep = M.lookup idx (stateUpdatedAt state) == Just targetStep
-        in eq { eqNewlyCreated = wasCreatedInStep
-              , eqNewlyUpdated = wasUpdatedInStep
-              }) (zip [0..] (stateResult state))
-  in state { stateResult = updatedResult }
 
 -- | Display the analysis state at step i as LaTeX
 display :: Int -> T.Text
 display i =
-  let rawState = computeState i
-      colorizedState = applyStepColorization i rawState
-      visibleEqs = filter eqVisible (stateResult colorizedState)
+  let finalState = computeState i i
+      visibleEqs = filter eqVisible (stateResult finalState)
       renderedEqs = map renderEquation visibleEqs
       eqnLines = case renderedEqs of
                    [] -> []
