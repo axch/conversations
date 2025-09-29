@@ -3,6 +3,14 @@ module AnimatedAnalysis (display) where
 import Data.Text qualified as T
 import Data.Map qualified as M
 import Data.Maybe (fromMaybe)
+import Data.String (IsString(..))
+
+-- | Newtype for binding names used as lookup keys
+newtype BindingName = BindingName T.Text
+  deriving (Show, Eq, Ord)
+
+instance IsString BindingName where
+  fromString = BindingName . T.pack
 
 -- | Represents an equation in the analysis with its state and formatting
 data Equation = Equation
@@ -18,28 +26,28 @@ data Equation = Equation
 data Binding = Binding
   { bindPoint :: T.Text
   , bindValues :: [T.Text]
-  , bindAffects :: [T.Text]
+  , bindAffects :: [BindingName]
   } deriving (Show)
 
 -- | Analysis state containing equations and metadata
 data State = State
-  { stateData :: M.Map T.Text Binding
+  { stateData :: M.Map BindingName Binding
   , stateResult :: [Equation]
-  , stateResIndexes :: M.Map T.Text Int
-  , stateContext :: Maybe T.Text
-  , stateLastName :: Maybe T.Text
+  , stateResIndexes :: M.Map BindingName Int
+  , stateContext :: Maybe BindingName
+  , stateLastName :: Maybe BindingName
   , stateCreatedAt :: M.Map Int Int  -- equation index -> step created
   , stateUpdatedAt :: M.Map Int Int  -- equation index -> step last updated
   } deriving (Show)
 
 -- | Commands that can be executed to modify the analysis state
 data Command
-  = Create T.Text
-  | Act T.Text Command
-  | Act2 T.Text Command Command
-  | Evaluate (Maybe T.Text)
-  | Hiding [T.Text] Command
-  | Depends T.Text
+  = Create BindingName
+  | Act BindingName Command
+  | Act2 BindingName Command Command
+  | Evaluate (Maybe BindingName)
+  | Hiding [BindingName] Command
+  | Depends BindingName
   deriving (Show)
 
 -- | Create a new equation with the given binding
@@ -79,7 +87,7 @@ renderEquation eq = bindingR <> " & " <> mapstoR <> " & " <> valueR
       | otherwise = eqValue eq
 
 -- | Initial data bindings (from Ruby @data hash)
-initialData :: M.Map T.Text Binding
+initialData :: M.Map BindingName Binding
 initialData = M.fromList
   [ ("mandel_expr", Binding "\\exp{(iterate (real 400) (step c) c:0)}, \\env{1}" ["\\RR"] [])
   , ("iterate_var1", Binding "\\exp{iterate}, \\env{1}" ["\\obj{iterate}"] [])
@@ -173,12 +181,12 @@ executeCommand step firstLight state cmd = case cmd of
   Create name -> createBinding step firstLight name state
   Act name subCmd -> actOnBinding step firstLight name subCmd state
   Act2 name cmd1 cmd2 -> actOnBinding step firstLight name cmd2 (actOnBinding step firstLight name cmd1 state)
-  Evaluate mName -> evaluateBinding step firstLight (fromMaybe (fromMaybe T.empty (stateLastName state)) mName) state
+  Evaluate mName -> evaluateBinding step firstLight (fromMaybe (fromMaybe "" (stateLastName state)) mName) state
   Hiding names subCmd -> hideBindings names (executeCommand step firstLight state subCmd)
   Depends name -> dependsOnContext name state
 
 -- | Create a new binding equation
-createBinding :: Int -> Bool -> T.Text -> State -> State
+createBinding :: Int -> Bool -> BindingName -> State -> State
 createBinding step firstLight name state =
   let binding = M.findWithDefault (Binding T.empty [] []) name (stateData state)
       newEq = mkEquation (bindPoint binding) firstLight
@@ -194,7 +202,7 @@ createBinding step firstLight name state =
        Nothing -> newState
 
 -- | Act on a binding (make it non-actionable and execute subcommand)
-actOnBinding :: Int -> Bool -> T.Text -> Command -> State -> State
+actOnBinding :: Int -> Bool -> BindingName -> Command -> State -> State
 actOnBinding step firstLight name subCmd state =
   let maybeIdx = M.lookup name (stateResIndexes state)
   in case maybeIdx of
@@ -208,7 +216,7 @@ actOnBinding step firstLight name subCmd state =
        Nothing -> state
 
 -- | Evaluate a binding (update its value)
-evaluateBinding :: Int -> Bool -> T.Text -> State -> State
+evaluateBinding :: Int -> Bool -> BindingName -> State -> State
 evaluateBinding step firstLight name state =
   let maybeIdx = M.lookup name (stateResIndexes state)
       maybeBinding = M.lookup name (stateData state)
@@ -238,7 +246,7 @@ evaluateBinding step firstLight name state =
        _ -> state
 
 -- | Make affected bindings actionable
-makeAffectedActionable :: [T.Text] -> State -> [Equation] -> [Equation]
+makeAffectedActionable :: [BindingName] -> State -> [Equation] -> [Equation]
 makeAffectedActionable affects state result =
   foldr (\name acc -> case M.lookup name (stateResIndexes state) of
                         Just idx | idx < length acc ->
@@ -248,7 +256,7 @@ makeAffectedActionable affects state result =
                         _ -> acc) result affects
 
 -- | Hide specified bindings
-hideBindings :: [T.Text] -> State -> State
+hideBindings :: [BindingName] -> State -> State
 hideBindings names state =
   let newResult = map (\eq ->
         if any (\name -> case M.lookup name (stateResIndexes state) of
@@ -259,7 +267,7 @@ hideBindings names state =
   in state { stateResult = newResult }
 
 -- | Add dependency relationship - adds context to new binding's affects list
-addDependency :: T.Text -> T.Text -> State -> State
+addDependency :: BindingName -> BindingName -> State -> State
 addDependency name ctxName state =
   case M.lookup name (stateData state) of
     Just binding ->
@@ -269,7 +277,7 @@ addDependency name ctxName state =
     Nothing -> state
 
 -- | Add dependency (used by Depends command)
-dependsOnContext :: T.Text -> State -> State
+dependsOnContext :: BindingName -> State -> State
 dependsOnContext name state = case stateContext state of
   Just ctx -> addDependency name ctx state
   Nothing -> state
@@ -286,9 +294,9 @@ getPreviousDisplayStep i =
     prev -> last prev
 
 -- | Execute commands up to step i and return final state
-computeState :: Int -> Int -> State
-computeState targetStep i =
-  let validCommands = take (i + 1) commands
+computeState :: Int -> State
+computeState targetStep =
+  let validCommands = take (targetStep + 1) commands
       lastDisplayed = getPreviousDisplayStep targetStep
       -- Steps after lastDisplayed get first_light = true (simulating Ruby's @@last_displayed logic)
       stepHasFirstLight step = step > lastDisplayed
@@ -299,7 +307,7 @@ computeState targetStep i =
 -- | Display the analysis state at step i as LaTeX
 display :: Int -> T.Text
 display i =
-  let finalState = computeState i i
+  let finalState = computeState i
       visibleEqs = filter eqVisible (stateResult finalState)
       renderedEqs = map renderEquation visibleEqs
       eqnLines = case renderedEqs of
