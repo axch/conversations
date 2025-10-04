@@ -24,10 +24,17 @@ jobs:
           cabal-version: "3.12.1.0"   # pin cabal-install
           cabal-update: false         # we rely on your pinned index-state
 
-      - name: Cache cabal store
+      - name: Enable ghcup download cache
+        run: |
+          mkdir -p ~/.ghcup
+          printf "cache: true\n" >> ~/.ghcup/config.yaml
+
+      - name: Cache ghcup tarballs + cabal store
         uses: actions/cache@v4
         with:
-          path: ${{ steps.haskell.outputs.cabal-store }}
+          path: |
+            ~/.ghcup/cache
+            ${{ steps.haskell.outputs.cabal-store }}
           key: cabal-${{ runner.os }}-ghc${{ steps.haskell.outputs.ghc-version }}-cabal${{ steps.haskell.outputs.cabal-version }}-${{ hashFiles('**/*.cabal', 'cabal.project', 'cabal.project.freeze') }}
           restore-keys: |
             cabal-${{ runner.os }}-ghc${{ steps.haskell.outputs.ghc-version }}-cabal${{ steps.haskell.outputs.cabal-version }}-
