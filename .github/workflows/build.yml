@@ -22,7 +22,7 @@ jobs:
         with:
           ghc-version: "9.6.7"        # pin GHC
           cabal-version: "3.12.1.0"   # pin cabal-install
-          cabal-update: false         # we rely on your pinned index-state
+          cabal-update: true
 
       - name: Enable ghcup download cache
         run: |
