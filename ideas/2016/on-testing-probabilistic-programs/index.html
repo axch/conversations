@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href="https://fonts.googleapis.com/css?family=Merriweather+Sans:800,400italic|Inconsolata:400|Merriweather:400,400italic" rel="stylesheet" type="text/css">
+
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta content="width=device-width" name="viewport">
+  <title>On Testing Probabilistic Programs</title>
+
+  
+  <meta name="author" content="Alexey Radul" />
+  
+
+  <link rel="stylesheet" type="text/css" href="../../../css/erudite.css" />
+  <link rel="icon" href="../../../favicon.ico" />
+  <link rel="alternate" type="application/rss+xml" title="Conversations Updates -- RSS" href="../../../feed.xml" />
+  
+</head>
+
+<body>
+
+  <div id="wrapper" class="hfeed">
+    <div id="header-wrap">
+      <div id="header" role="banner">
+        <h1 id="blog-title"><span><a href="../../../" title rel="home">Conversations</a></span></h1>
+        <div id="blog-description"></div>
+      </div><!--  #header -->
+      <div id="access" role="navigation">
+        <div class="skip-link"><a href="#content" title></a></div>
+      </div><!-- #access -->
+    </div><!--  #header-wrap -->
+
+    <div id="container">
+      <div id="content" role="main">
+        <article class="hentry" itemscope itemtype="http://schema.org/BlogPosting">
+  
+  <header>
+    <h2 class="entry-title" itemprop="name"><em>On</em> Testing Probabilistic Programs</h2>
+  </header>
+
+  <div class="entry-meta">
+
+    <span class="entry-date">
+      <abbr class="published">April 29, 2016</abbr>
+    </span>
+    <span class="author vcard">
+      By Alexey Radul
+    </span>
+  </div>
+
+  <div class="entry-content" itemprop="articleBody">
+    <p>Testing traditional software strives for an ideal of exact
+determinacy: If a test fails, there is a bug and the developers must
+investigate; and if a test passes, the bugs it is testing for are not
+present, so development can proceed without worrying about them. This
+is not possible with <a href="../../../ideas/2016/on-intentionally-random-programs">probabilistic</a>
+<a href="../../../ideas/2016/probabilistic-programming-habits">programs</a>—even a correct sampler
+for a probability distribution always has <em>some</em> chance of producing
+arbitrarily weird output by bad luck, and an incorrect one can equally
+well look fine by coincidence. In this piece, I want to
+lay out my current thinking on what to do about this problem.</p>
+<h2 id="contents">Contents</h2>
+<ul>
+<li><a href="#a-general-case">A General Case</a>
+<ul>
+<li><a href="#significance">Significance</a></li>
+<li><a href="#power">Power</a></li>
+</ul></li>
+<li><a href="#test-framework">Test Framework</a>
+<ul>
+<li><a href="#scaling">Scaling</a></li>
+</ul></li>
+<li><a href="#statistical-optimizations">Statistical Optimizations</a></li>
+<li><a href="#computational-optimizations">Computational Optimizations</a></li>
+<li><a href="#composition">Composition</a></li>
+<li><a href="#conclusion">Conclusion</a></li>
+<li><a href="#acknowledgements">Acknowledgements</a></li>
+<li><a href="#references">References</a></li>
+<li><a href="#notes">Notes</a></li>
+</ul>
+<h2 id="a-general-case"><em>A</em> General Case</h2>
+<p>I’d like to start by investigating as general a probabilistic testing
+situation as I can think of, and then refine what we find in a few
+directions.</p>
+<p>Consider the following stochastic testing scenario.</p>
+<blockquote>
+Here is a black box, <span class="math inline">\(\F\)</span>, which performs some arbitrary stochastic
+computation under test and somehow evaluates whether the result is
+good. I consider the behavior of <span class="math inline">\(\F\)</span> acceptable if its probability of
+reporting a bad result is less than <span class="math inline">\(p\)</span>.
+</blockquote>
+<p>For instance, one might test a program for, say, Gaussian process
+function learning, by showing it examples drawn from a known function,
+running training for a while, and asking it to extrapolate to a new
+input point. Presumably one cannot analytically predict what the
+extrapolation distribution should be, but one can call a trial “good”
+if it’s within some distance of the true function’s value there.
+Presumably one also cannot analytically predict the probability that a
+correct training pipeline will still extrapolate badly on this example
+by chance; but one could make up a plausible minimum rate of success
+and claim that the whole training pipeline works “well enough” if it
+produces “bad” extrapolations at most <span class="math inline">\(20\%\)</span> of the time.</p>
+<p>What is a testing framework to do with a test like this? At this
+interface, the only thing that can be done is to run the black box
+some number of times <span class="math inline">\(n\)</span>, and report the overall test as having failed if
+the black box reports bad results at least some fraction <span class="math inline">\(f\)</span> of the
+time.<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>
+<h3 id="significance">Significance</h3>
+<p>How well does this work? For any given <span class="math inline">\(f\)</span> and <span class="math inline">\(n\)</span>, we can compute
+(an upper bound on) the probability that a correctly-implemented <span class="math inline">\(\F\)</span>
+will nonetheless fail such a test by chance.<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a> This
+probability is called the <em>statistical significance</em> of the
+test.<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a> Here’s a chart showing how the probability of failing a
+<span class="math inline">\(10\)</span>-trial test with cutoff <span class="math inline">\(3\)</span> (marked at <span class="math inline">\(f = 0.35\)</span>)
+varies with the true bad result rate of <span class="math inline">\(\F\)</span>.</p>
+<div style="width:100%">
+<p><img src="example-sig.png" /></p>
+</div>
+<p>The figure marks an example value for the “no bug” probability <span class="math inline">\(p\)</span> at <span class="math inline">\(0.26\)</span> and
+traces the false fail rate (<span class="math inline">\(\approx 0.2479\)</span>) thus obtained. Changing <span class="math inline">\(f\)</span> moves the
+inflection point of the curve, and increasing <span class="math inline">\(n\)</span> makes the curve
+steeper.</p>
+<p>The false fail rate bound is
+given by the worst still-acceptable behavior of <span class="math inline">\(\F\)</span>, namely to report
+a bad result with probability exactly <span class="math inline">\(p\)</span>. In this case, for the overall test
+to fail we must see at least <span class="math inline">\(fn\)</span> bad results in <span class="math inline">\(n\)</span> trials, the
+probability of which,
+<span class="math display">\[
+\sum_{i=\lceil fn \rceil}^n {n \choose i} p^i (1-p)^{n-i}
+  = 1 - \textrm{CDF}_{\textrm{binomial}(n, p)}(fn),
+\]</span>
+is given by the survivor function of the binomial distribution on <span class="math inline">\(n\)</span>
+trials with probability <span class="math inline">\(p\)</span>. This quantity is readily computable, and
+tends to zero as <span class="math inline">\(n\)</span> tends to infinity, provided <span class="math inline">\(f &gt; p\)</span>. In other
+words, if we set the bad result rate cutoff <span class="math inline">\(f\)</span> above the maximum
+acceptable true probability of bad results <span class="math inline">\(p\)</span>, we can drive the
+probability of false alarms in our test suite arbitrarily low (but
+never to exactly zero) by spending more computation (increasing <span class="math inline">\(n\)</span>).
+As far as false alarms go, this is the next best thing to ideal testing.</p>
+<h3 id="power">Power</h3>
+<p>So far so good. But, of course, we don’t need any of this math to
+make a very fast test with a very low rate of false alarms—just
+always pass! Testing has another desideratum, namely keeping the
+chance of passing despite the presence of bugs down as well. This
+chance is called the <em>statistical power</em>.<a href="#fn4" class="footnote-ref" id="fnref4" role="doc-noteref"><sup>4</sup></a></p>
+<p>Unfortunately, it is not possible to obtain high significance and high
+power at once when trying to arbitrate an infintely fine boundary with
+a finite amount of computation. If we want high significance, then
+however large we may set the number
+of trials <span class="math inline">\(n\)</span>, we have to set the
+decision boundary <span class="math inline">\(f\)</span> at least a little larger than the “acceptable”
+bad result rate <span class="math inline">\(p\)</span>. But then, if the true bad result
+rate of <span class="math inline">\(\F\)</span> is, say, between <span class="math inline">\(p\)</span> and <span class="math inline">\(f\)</span>, this is nominally “a bug”,
+but the chance of detecting it and failing the overall test will not
+be high.</p>
+<p>So we have to fall back one more time, and say that we will tolerate
+our test suite being unable to reliably catch bugs with “small”
+consequences, provided it has high power against bugs whose effects
+are “severe enough”. This idea is often called the <em>effect size</em> in the
+statistical hypothesis testing literature.</p>
+<p>To wit, we can name an arbitrary <span class="math inline">\(q
+&gt; p\)</span> and say that <span class="math inline">\(\F\)</span> exhibits a “severe bug” if its true probability
+of reporting a bad result is at least <span class="math inline">\(q\)</span>. We can add this <span class="math inline">\(q\)</span> to our chart:</p>
+<div style="width:100%">
+<p><img src="example-pwr.png" /></p>
+</div>
+<p>The curve now also gives the probability of passing (right scale) the
+overall test. The updated figure now marks an example “severe
+bug” probability <span class="math inline">\(q\)</span> at <span class="math inline">\(0.44\)</span>, and traces the false pass rate
+(<span class="math inline">\(\approx 0.2877\)</span>) thus obtained. Moving the inflection point by
+changing <span class="math inline">\(f\)</span> trades off significance for power in a given experimental
+design. Making the curve steeper by increasing <span class="math inline">\(n\)</span> offers greater
+significance and power at once, at the cost of additional computation.</p>
+<p>Formally, a test consisting
+of <span class="math inline">\(n\)</span> trials and failing if at least an <span class="math inline">\(f\)</span>-fraction of them are bad
+will have a false pass rate of at most
+<span class="math display">\[
+\sum_{i=0}^{\lfloor fn \rfloor} {n \choose i} q^i (1-q)^{n-i}
+  = \textrm{CDF}_{\textrm{binomial}(n, q)}(fn).
+\]</span>
+This quantity is also readily computable, and also tends to zero as
+<span class="math inline">\(n\)</span> tends to infinity, provided <span class="math inline">\(f &lt; q\)</span>. So for any desired
+significance and power, and any finite effect size to be detected, we
+can construct a test with those characteristics by picking some <span class="math inline">\(p &lt; f
+&lt; q\)</span> and some sufficiently large <span class="math inline">\(n\)</span>. (Which we might as well
+minimize subject to these constraints.)</p>
+<h2 id="test-framework">Test Framework</h2>
+<p>So here we have four variables of interest to whoever is running the
+test suite:</p>
+<ul>
+<li><p>Statistical significance, or probability of a false alarm even if
+the tested system works;</p></li>
+<li><p>Effect size, or some measure of the severity of the effects of bugs
+with detection guarantees;</p></li>
+<li><p>Statistical power, or the probability of a false pass even if the
+tested system actually contains a severe bug; and</p></li>
+<li><p>Computational cost of the test.</p></li>
+</ul>
+<p>A test framework can permit the operator to specify any desired three
+of these (e.g., by command line arguments) and deduce the fourth (and
+the allowable bad result rate, which is needed for running the test but
+is not otherwise interesting). Here is a Python function that
+computes <span class="math inline">\(n\)</span> and <span class="math inline">\(fn\)</span> from <span class="math inline">\(p\)</span>, <span class="math inline">\(q\)</span>, the significance, and the power:</p>
+<pre><code>from scipy.stats import binom
+
+def design(p, q, sig, pwr):
+    # p is the max bug-free probability of a bad trial
+    assert p &gt;= 0 and p &lt; 1
+    # q is the min severe-bug probability of a bad trial
+    assert q &gt; p and q &lt;= 1
+    # sig is the desired max probability of a false fail
+    assert sig &gt; 0 and sig &lt;= 1
+    # pwr is the desired max probability of a false pass
+    assert pwr &gt; 0 and pwr &lt;= 1
+    n = 1
+    while True:
+        # Minium k for the desired false alarm rate is given
+        # by the inverse survivor function of the binomial
+        # distribution
+        min_k = binom.isf(sig, n, p)
+        # Maximum k for the desired false pass rate is given
+        # by the inverse CDF of the binomial distribution
+        max_k = binom.ppf(pwr, n, q)
+        if max_k &gt; min_k:
+            # scipy's fenceposts are such that running n
+            # trials and failing if strictly more than min_k
+            # of them are bad achieves the requested
+            # significance and power.
+            return (n, min_k)
+        else:
+            n += 1</code></pre>
+<p>Exercise for the reader: Prove that the optimal design is
+unique. That is, when <code>design</code> returns, <code>max_k == min_k + 1</code>.</p>
+<p>The other directions are simpler: if the computational budget <span class="math inline">\(n\)</span> and,
+say, the desired significance <code>sig</code> are fixed, the number of bad results
+that must be tolerated is given by <code>min_k = binom.isf(sig, n, p)</code> as
+above. Tolerating no more than that simultaneously optimizes the
+power for all possible effect sizes. The resulting strength of
+detection curve can be reported to the test suite operator to let them
+judge whether it is acceptable.</p>
+<h3 id="scaling">Scaling</h3>
+<p>Permit me a few observations on how well designs constructed by
+<code>design</code> stand to perform.</p>
+<ul>
+<li><p>Some modest number of samples like <span class="math inline">\(50\)</span> really don’t get one all
+that far. For example,</p>
+<p><code>design(0.05, 0.3, 1e-3, 1e-3) == (73, 10)</code>.</p></li>
+<li><p>Detecting small effects with good significance and power can take
+<em>many</em> trials, especially if <span class="math inline">\(p\)</span> is already large. For example,</p>
+<p><code>design(0.3, 0.31, 1e-3, 1e-3) == (80983, 24698)</code>.</p></li>
+<li><p><span class="math inline">\(n\)</span> should be logarithmic in power, b/c running the same test
+twice and failing if either fails is a lower bound on what you
+can get by doubling the number of trials, and squares the
+probability of a false pass.</p></li>
+<li><p>Similary, <span class="math inline">\(n\)</span> should be logarithmic in significance, b/c running
+twice and failing only if both fail squares the probability of a
+false fail.</p></li>
+<li><p>If <span class="math inline">\(np(1-p)\)</span> is large relative to <span class="math inline">\(1\)</span>, <span class="math inline">\(n\)</span> should be quadratic
+in <span class="math inline">\(1/(q-p)\)</span> (inverse absolute effect size). Why? For fixed
+significance, the decision boundary needs to exclude that much
+mass in the failure frequency distribution. If <span class="math inline">\(n\)</span> is large
+relative to <span class="math inline">\(p(1-p)\)</span>, the shape of the distribution will be
+Gaussian, so the mass excluded by a decision boundary will be
+given by the number of standard deviations that boundary is away
+from the mode. Squeezing the effect size squeezes the room
+available to place the decision boundary, so will require a
+proportional squeeze on the standard deviation, which will
+require a quadratic increase in <span class="math inline">\(n\)</span>.</p></li>
+<li><p>For small <span class="math inline">\(p\)</span> and fixed <em>relative</em> effect size, <span class="math inline">\(n\)</span> should be
+linear in <span class="math inline">\(1/p\)</span>. Why? Holding <span class="math inline">\(np\)</span> constant will leave the
+distribution on observed spurious failures more or less fixed,
+near a Poisson with rate <span class="math inline">\(np\)</span>. By “fixed relative effect size”
+I mean that <span class="math inline">\(q = cp\)</span> for some constant <span class="math inline">\(c\)</span>. In this regime,
+holding <span class="math inline">\(np\)</span> fixed will also hold <span class="math inline">\(nq\)</span> fixed, thus keeping the
+distribution on observed failures given the minimal severe bug
+fixed as well, near a Poisson with rate <span class="math inline">\(nq\)</span>. The desired
+decision boundary and obtained significance and power will be
+determined by those two Poisson distributions.</p></li>
+<li><p>For fixed <em>absolute</em> effect size, at some point reducing <span class="math inline">\(p\)</span> will
+stop significantly moving <span class="math inline">\(q\)</span> or making significant room to
+obtain the desired power by moving the decision boundary, so <span class="math inline">\(n\)</span>
+will asymptote to a constant and the obtained false failure rate
+will tend to zero.</p></li>
+</ul>
+<h2 id="statistical-optimizations">Statistical Optimizations</h2>
+<p>The above discussion assumes very little about the procedure under
+test. Often enough, there will be circumstances where more is known.
+In this case, doing more math will let one obtain the same
+discrimination strength with less computation.</p>
+<p>For example, suppose the procedure <span class="math inline">\(\P\)</span> under test were a random
+function returning objects from the set {apple, banana, orange, pear},
+and one analytically knew the exact probability distribution on
+outputs that it should have if implemented correctly. Sticking
+strictly to the above interface, one would have to come up with some
+crockery like “run <span class="math inline">\(\P\)</span> fifty times, compute the <span class="math inline">\(\chi^2\)</span> statistic on
+the results (against the expected frequencies), and assert that it is
+less than <span class="math inline">\(1\%\)</span> no more than <span class="math inline">\(1\%\)</span> of the time.” Which the above test
+framework would then decide to run maybe a hundred times to obtain the
+desired overall significance, for a total of <span class="math inline">\(5,\!000\)</span> runs of <span class="math inline">\(\P\)</span>.</p>
+<p>Needless to say, this is rather inefficient. <span class="math inline">\(5,\!000\)</span> runs of <span class="math inline">\(\P\)</span> are
+enough to get plenty good significance by doing a single big
+<a href="https://en.wikipedia.org/wiki/Pearson_chi-squared_test"><span class="math inline">\(\chi^2\)</span> test</a>
+and inspecting its p-value. The <span class="math inline">\(\chi^2\)</span> test has well-defined
+measures of effect size,<a href="#fn5" class="footnote-ref" id="fnref5" role="doc-noteref"><sup>5</sup></a> and corresponding power analyses, so much
+computation can be saved by directly implementing a test controller
+for <span class="math inline">\(\chi^2\)</span> with knobs for significance, power, effect size, and
+compute budget, instead of going through the Boolean case above.
+Presumably, many other standard statistical tests can be treated
+similarly to good effect.<a href="#fn6" class="footnote-ref" id="fnref6" role="doc-noteref"><sup>6</sup></a></p>
+<p>The concept of “alternate hypothesis” becomes more relevant for a more
+structured test than for the basic Boolean scenario. Suppose I am
+actually writing a regression test, and I have a definite other
+distribution that I expect <span class="math inline">\(\P\)</span> to produce if it contains the
+particular implementation bug I am looking for. It seems appropriate
+for a testing framework to allow (but not require) a test author to
+specify such an alternative (or set of alternatives) in the test
+definition. It would then be up to the test framework to automatically
+compute what “effect size” that corresponds to and make sure that the
+specified alternative registers as a sufficiently “severe” bug that the
+overall test power guarantee applies to it.</p>
+<h2 id="computational-optimizations">Computational Optimizations</h2>
+<p>A different kind of optimization would be stopping early when the
+trials are coming up sufficiently extreme. For example, if one is
+starting <span class="math inline">\(100\)</span> scheduled runs of some testee <span class="math inline">\(\F\)</span> that’s expected to
+report bad results no more than <span class="math inline">\(20\%\)</span> of the time, and one finds that <span class="math inline">\(19\)</span> of the
+first <span class="math inline">\(20\)</span> trials were bad, one would not be unjustified in thinking
+that failing immediately is sound and would speed the overall test up
+by a factor of four.</p>
+<p>Indeed, it’s tempting to follow the above intuition and define a
+testing procedure for <span class="math inline">\(\F\)</span> like this:</p>
+<ol type="1">
+<li>Repeat:</li>
+<li>Run <span class="math inline">\(\F\)</span> once and record the result;</li>
+<li>If the probability, assuming no bug, of at least as many bad results
+as recorded is less than <code>sig</code>, stop and report failure;</li>
+<li>If the probability, assuming a severe bug, of at least as many good results
+as recorded is less than <code>pwr</code>, stop and report success;</li>
+<li>Else continue.</li>
+</ol>
+<p>This procedure does have the merit that if the true behavior of <span class="math inline">\(\F\)</span>
+is very far from the decision boundary, it will run fewer than <span class="math inline">\(n\)</span>
+trials, and come to a conclusion in less time. It has the demerit,
+however, that its significance and power are different from the given
+<code>sig</code> and <code>pwr</code>. Why? Consider some sequence of <span class="math inline">\(n\)</span> results that
+would cause the test to pass if observed in full. It could, by
+chance, have been skewed to have relatively more bad results in the
+beginning, and may therefore cause the above procedure to fail the
+test instead, increasing the false failure rate. Of course, another
+sequence that leads to a failure if observed in full could be skewed
+optimistic, and lead to an early pass, lowering the false failure
+rate. Which force dominates is not apparent a priori, but I suspect
+that the overall rate of mistakes will be higher than advertised if
+early stopping is permitted.</p>
+<p>Does that mean there is no hope for running fewer than the allotted
+<span class="math inline">\(n\)</span> trials in extreme circumstances? No. It just means that the
+end-to-end behavior of the test driver needs to studied. A
+general deterministic driver is a decision function that maps
+sequences of observed trials to one of three actions: “Stop and fail”,
+“Stop and pass”, or “Continue”. At any given effect size of interest,
+the significance and power obtained by such a function are well
+defined. Studying these, and choosing good functions for various testing
+situations,<a href="#fn7" class="footnote-ref" id="fnref7" role="doc-noteref"><sup>7</sup></a> is a corner of statistics named <em>sequential inference</em>,
+for example <a href="https://projecteuclid.org/download/pdf_1/euclid.aoms/1177731118">Wald 1945</a>.
+In fact, that paper presents a design for a sequential testing procedure
+that does obtain any requested significance and power, and claims an
+expected <span class="math inline">\(\approx 50\%\)</span> reduction in the expected number of trials needed
+vs static experimental design.</p>
+<p>A different kind of computational optimization comes by borrowing from
+traditional software development the idea of continuous integration.
+The standard story is that one gets a server (or a software as a
+service provider) to watch one’s version control system, and on every
+commit, rebuild the software and rerun the test suite. For software
+that’s intended to be deterministic, that is the maximum possible use
+of computation for testing: full test run (<span class="math inline">\(n=1\)</span>) on every commit.</p>
+<p>For probabilistic programs, however, the benefit that can be derived
+from “always on” resources is unlimited—having the budget to raise
+<span class="math inline">\(n\)</span> can always lead to better significance or better power or both.
+Alternately, the benefit can be thought of as spreading the work
+required for a large <span class="math inline">\(n\)</span> over multiple testing stages, and producing a
+live report of current success/fail state and significance/power
+thereof in the presence of adequate incremental progress.</p>
+<p>There is an additional opportunity around being able to pool testing
+results across different versions (commit states) of the software
+under test. The challege preceding that opportunity is to derive or
+infer a reasonable model of which commits did or did not have
+meaningful effects on which tests in the test suite. I think all of
+this would be a very fruitful avenue for a toolsmith to explore.</p>
+<h2 id="composition">Composition</h2>
+<p>So far, we’ve only talked about iterating a single test, but in this
+regime, composing multiple tests into a test suite is also somewhat
+trickier than in the deterministic case. Indeed, suppose we have
+<span class="math inline">\(100\)</span> tests, each independently capable of failing by chance even if
+the code is correct with probability, say, <span class="math inline">\(10^{-5}\)</span>. Then an overall
+test suite consisting of running each of those tests once will fail by
+chance with a probability just shy of <span class="math inline">\(10^{-3}\)</span>. A test framework
+should be aware of this, either by automatically adjusting the
+significance expected of individual tests in order to meet a
+test-suite-level significance goal, or at least by reporting the
+overall significance obtained by any given test run.</p>
+<p>Statistical power composes differently from statistical significance.
+Since an aggregate test suite is judged to pass only if all its
+constituent tests pass, the probability of a false pass in any given
+state of bugginess can only go down as more tests are added. And
+indeed, it goes down quite precipitously if we add redundant tests
+that cover the same underlying bugs, or if our continuous integration
+system redundantly re-runs the tests we have.</p>
+<p>However, there is a sense in which having more tests demands greater
+power as well. To wit, a larger test suite presumably exercises more
+potential bugs, so our prior (before testing) state of belief about
+the software places more weight on some covered bug being present.
+Therefore, we may reasonably wish for more power in each individual
+test to obtain a comparable post-test state of belief that none of the
+covered bugs are present.</p>
+<p>This phenomenon can be quantified in the simple (and also pessimistic)
+case where we assume that all the tests cover completely disjoint
+aspects of the software, so that any given bug of interest will only
+affect the one test that covers it. Suppose we have <span class="math inline">\(100\)</span> potential
+such bugs, and we assume each is independently present with a prior
+probability of <span class="math inline">\(10\%\)</span>. If we run a single test with a false pass rate
+of <span class="math inline">\(0.01\)</span> and a true pass rate of <span class="math inline">\(0.99\)</span> and it passes, the
+posterior probability of the bug being absent is<a href="#fn8" class="footnote-ref" id="fnref8" role="doc-noteref"><sup>8</sup></a><a href="#fn9" class="footnote-ref" id="fnref9" role="doc-noteref"><sup>9</sup></a></p>
+<p><span class="math display">\[\begin{eqnarray*}
+p(no\ bug\ |\ pass) &amp; = &amp; \frac{p(no\ bug)p(pass\ |\ no\ bug)}{p(pass)} \\
+&amp; = &amp; \frac{0.9 \cdot 0.99}{0.1 \cdot 0.01 + 0.9 \cdot 0.99} \\
+&amp; \approx &amp; 1 - 1.121 \cdot 10^{-3} \\
+&amp; = &amp; 891:1 \odds \approx 29.5 \db \evid.
+\end{eqnarray*}\]</span></p>
+<p>Now suppose we run a test suite of <span class="math inline">\(100\)</span> tests, each covering exactly
+one of our bugs, and they all pass. Then the posterior probability
+of none of those bugs being present is</p>
+<p><span class="math display">\[\begin{eqnarray*}
+&amp; &amp; p(no\ bugs\ |\ 100\ passes) \\
+&amp; = &amp; \frac{0.9^{100} 0.99^{100} }
+   {\sum_{i=0}^{100} {100 \choose i} 0.1^i 0.9^{100 - i} 0.01^i 0.99^{100 - i}} \\
+&amp; \approx &amp; 1 - 1.061 \cdot 10^{-1} \\
+&amp; \approx &amp; 8.43:1 \odds \approx 9.26 \db \evid.
+\end{eqnarray*}\]</span></p>
+<p>In other words, the chances of a lurking bug are about <span class="math inline">\(100\)</span> times
+higher. To obtain the same posterior on being bug-free that we had
+before, we would need to increase the power of each individual test.
+In this case, setting the false pass rate to <span class="math inline">\(10^{-4}\)</span> yields</p>
+<p><span class="math display">\[\begin{eqnarray*}
+p(no\ bugs\ |\ 100\ strict\ passes) &amp; \approx &amp; 1 - 1.122 \cdot 10^{-3} \\
+&amp; \approx &amp; 890:1 \odds \\
+&amp; \approx &amp; 29.5 \db \evid.
+\end{eqnarray*}\]</span></p>
+<p>With these numbers, about the same effect can be obtained by rerunning
+the suite of <span class="math inline">\(100\)</span> tests three times (if it passes all three times).
+Controlling the power of the individual tests, however, can often
+yield the same effect with less computation.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>In sum, I think Someone<sup>TM</sup> should write a statistical test
+framework along the above lines for testing programs that are supposed
+to exhibit stochastic behavior. I posit that the four-way interaction
+between significance, effect size, power, and computational cost is
+the next best thing to the unobtainable ideal of deterministic
+testing.<a href="#fn10" class="footnote-ref" id="fnref10" role="doc-noteref"><sup>10</sup></a> And it’s implementable, composable, and can
+make use of known statistical analysis to improve performance. What
+more can one ask?</p>
+<h2 id="acknowledgements">Acknowledgements</h2>
+<p>Thanks to Taylor Campbell, Gregory Marton, and Ulrich Schaechtle for
+commentary on a draft.</p>
+<h2 id="references">References</h2>
+<ul>
+<li>A. Wald, “Sequential Tests of Statistical Hypotheses”,
+Ann. Math. Statist. 16(2), 1945, pp. 117-186.
+<a href="https://projecteuclid.org/euclid.aoms/1177731118">https://projecteuclid.org/euclid.aoms/1177731118</a></li>
+</ul>
+<h2 id="notes">Notes</h2>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script type="text/javascript">
+MathJax.Hub.Config({
+  TeX: {
+    Macros: {
+      F: "{\\mathcal{B}}",
+      P: "{\\mathcal{F}}",
+      odds: "{\\ \\mathrm{odds}}",
+      db: "{\\ \\mathrm{db}}",
+      evid: "{\\ \\mathrm{evidence}}",
+    },
+    equationNumbers: { autoNumber: "AMS" },
+    noErrors: { disabled: true },
+  }
+});
+</script>
+<section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Of course, when testing real software, <span class="math inline">\(\F\)</span> could also
+crash. Presumably, <span class="math inline">\(\F\)</span> will never crash if the procedure under test
+is correct, so the test framework can signal failure immediately if
+that happens. In the rest of the post I concern myself with
+executions that could be consistent with correct behavior.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>Readers who know that I generally tend to favor the
+Bayesian approach to empirical reasoning may be wondering why I am
+framing the testing problem in frequentist style. Indeed, why study
+the worst-case (with respect to the true bad result rate of <span class="math inline">\(\F\)</span>)
+false pass and false fail rates of the test suite (holding uncertainty
+over the test results obtained)? Why not instead consider the
+posterior (after running the tests) strength of belief that there is a
+bug (given the results that were, in fact, obtained)?
+A few answers: First, frequentist analysis aesthetically feels like a better fit, because
+(for once!) we really are faced with a perfect infinitely repeatable
+experiment. Second, I don’t actually have good priors ready to hand about how
+likely various bugs of various severities may be. Third,
+while the experimental results are obtained by the test runner,
+they are effectively not obtained by the developer looking at
+the “pass” or “fail” summary. Thus, when designing the test runner’s
+policy, it makes sense to consider said developer’s uncertainty
+over said results.<a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3"><p>Except with the sense reversed: One speaks of a “very
+significant” test, i.e. of “large significance”, if the probability of
+false alarm is near zero.<a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn4"><p>The sense of power is also reversed: One speaks of a “very
+high power” test if the probability of false pass is near zero.<a href="#fnref4" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn5"><p>Nitpick: The kinds of effects to which one big <span class="math inline">\(\chi^2\)</span>
+test is sensitive are not exactly the same as the kinds of effects to
+which checking that many small <span class="math inline">\(\chi^2\)</span> tests pass independently is
+sensitive. I expect that, in the limit of infinite computation, both
+styles will detect any deviation in the behavior of <span class="math inline">\(\P\)</span>, but they
+will catch different bugs at any fixed significance and power. I don’t
+think the difference is very important, and in any case, I expect it
+to be swamped by the big test’s superior efficiency.<a href="#fnref5" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn6"><p>Even in circumstances lacking analytic results
+about the power of some statistical test (I’m looking at you,
+<a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test">Kolmogorov-Smirnov</a>),
+it should be possible to assess a test’s power empirically, by
+simulating instances of the expected “severe bug” situation and seeing
+how often the test still passes. On the one hand, doing this to good
+accuracy is likely to be rather computationally intensive, but on the
+other hand, the result can be cached across test runs. It raises an
+interesting theoretical wrinkle worth working out, namely the
+semantics of a test-suite-level power guarantee if the power of one of
+the constitutent tests is uncertain (but where the uncertainty admits
+a known distribution, deduced from the empirical study).<a href="#fnref6" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn7"><p>The natural Bayesian procedure is an interesting
+candidate here. To wit, start with some prior probability
+distribution on <span class="math inline">\(\F\)</span>’s true probability of bad results, and some payoff
+matrix for correctly and incorrectly passing or failing the overall
+test, as well as some assumed cost of additional computation. At each
+point, decide whether to continue by computing the expected value of
+information from one more trial, and when done report the test as a
+pass or a fail to maximize posterior expected payoff. To guarantee
+termination, it seems this method still needs a notion of “effect
+size” in its payoff matrix, to prevent it from oscillating forever if
+the true bad result rate turns out to be at its decision boundary.<a href="#fnref7" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn8"><p>Had you given up on me being able to sneak Bayes’ Rule
+into this post after all?<a href="#fnref8" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn9"><p>The “evidence” here is just the odds
+measured in decibels: A proposition with <span class="math inline">\(X \odds\)</span> has <span class="math inline">\(10\log_{10}(X)
+\db\)</span> evidence. Why do this? Two-exclusive-hypothesis posterior updating is
+summation of evidence; and decibels seem to be a pretty intuitive unit
+of measure for at least binary probabilities.<a href="#fnref9" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn10"><p>And indeed, it recovers that ideal as a special case:
+if <span class="math inline">\(p = 0\)</span> and <span class="math inline">\(q = 1\)</span>, one trial suffices for arbitrarily good
+significance and power.<a href="#fnref10" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+  </div>
+
+  <footer>
+    <div class="metadata">
+    </div>
+    <div class="nav-back">
+      <a href="../../../" title>← Conversations index</a>
+    </div>
+  </footer>
+</article>
+
+      </div><!-- #content -->
+    </div><!-- #container -->
+
+    <div id="footer">
+    </div><!-- #footer -->
+  </div><!-- #wrapper .hfeed -->
+</body>
+</html>

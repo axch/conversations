@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href="https://fonts.googleapis.com/css?family=Merriweather+Sans:800,400italic|Inconsolata:400|Merriweather:400,400italic" rel="stylesheet" type="text/css">
+
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta content="width=device-width" name="viewport">
+  <title>Compositional statistical unit testing</title>
+
+  
+  <meta name="author" content="Alexey Radul" />
+  
+
+  <link rel="stylesheet" type="text/css" href="../../../css/erudite.css" />
+  <link rel="icon" href="../../../favicon.ico" />
+  <link rel="alternate" type="application/rss+xml" title="Conversations Updates -- RSS" href="../../../feed.xml" />
+  
+</head>
+
+<body>
+
+  <div id="wrapper" class="hfeed">
+    <div id="header-wrap">
+      <div id="header" role="banner">
+        <h1 id="blog-title"><span><a href="../../../" title rel="home">Conversations</a></span></h1>
+        <div id="blog-description"></div>
+      </div><!--  #header -->
+      <div id="access" role="navigation">
+        <div class="skip-link"><a href="#content" title></a></div>
+      </div><!-- #access -->
+    </div><!--  #header-wrap -->
+
+    <div id="container">
+      <div id="content" role="main">
+        <article class="hentry" itemscope itemtype="http://schema.org/BlogPosting">
+  
+  <header>
+    <h2 class="entry-title" itemprop="name">Compositional statistical unit testing</h2>
+  </header>
+
+  <div class="entry-meta">
+
+    <span class="entry-date">
+      <abbr class="published">November 19, 2017</abbr>
+    </span>
+    <span class="author vcard">
+      By Alexey Radul
+    </span>
+  </div>
+
+  <div class="entry-content" itemprop="articleBody">
+    <p>How do you unit-test a sampler? Run it a bunch and see whether the
+histogram looks good—but there’s always <em>some</em> chance that your test
+will fail randomly even though the sampler is good, or pass randomly
+despite a bug. And if you try to have more than one test, the chance
+of random errors goes up. How big of a chance? How much worse does
+it get? What to do?</p>
+<p>I’ve <a href="../../2016/on-testing-probabilistic-programs/">written</a> about
+this problem before. That was a starting point. In this post,
+I want to</p>
+<ul>
+<li><p>Work out a general formalism for reasoning
+about the error rates of tests of stochastic software;</p></li>
+<li><p>Work out the rules of composition for tests in this formalism; and</p></li>
+<li><p>Build up to a usable test, namely discrete equality in distribution
+(one variant where the expected distribution is known and one where
+it is itself avaiable only as a sampler).</p></li>
+</ul>
+<p>This post is not so good for the math-averse—I need the crutch of
+precise reasoning to make sure I don’t miss anything important.</p>
+<h2 id="contents">Contents</h2>
+<ul>
+<li><p><a href="#calibrated-tests">Calibrated Tests</a></p></li>
+<li><p><a href="#calibrated-test-suites">Calibrated Test Suites</a></p>
+<ul>
+<li><p><a href="#amplifying-confidence">Amplifying Confidence</a></p></li>
+<li><p><a href="#composing-tests">Composing Tests</a></p></li>
+<li><p><a href="#negating-tests">Negating Tests</a></p></li>
+</ul></li>
+<li><p><a href="#usable-tests">Usable Tests</a></p>
+<ul>
+<li><p><a href="#a-building-block">A Building Block</a></p></li>
+<li><p><a href="#two-sample-equality-in-distribution">Two-Sample Equality in Distribution</a></p></li>
+<li><p><a href="#one-sample-equality-in-distribution">One-Sample Equality in Distribution</a></p></li>
+</ul></li>
+<li><p><a href="#conclusion">Conclusion</a></p></li>
+<li><p><a href="#notes">Notes</a></p></li>
+</ul>
+<h2 id="calibrated-tests">Calibrated tests</h2>
+<p>Suppose we are trying to statistically assess the behavior of some
+(presumably stochastic) software <span class="math inline">\(s\)</span>.
+Let <span class="math inline">\(\S\)</span> be the space of possible true behaviors of <span class="math inline">\(s\)</span>, the software under test.
+Then a single <em>calibrated test</em> <span class="math inline">\(T\)</span> is a 5-tuple: <span class="math inline">\((\tau, S^g, S^b,
+\alpha, \beta)\)</span> where</p>
+<ul>
+<li><span class="math inline">\(\tau: \S \to \bool\)</span> is a stochastic test procedure returning
+<span class="math inline">\(\text{True}\)</span> or <span class="math inline">\(\text{False}\)</span> (which presumably runs the software
+under test repeatedly and measures its behavior somehow),</li>
+<li><span class="math inline">\(S^g \subset \S\)</span> is the set of behaviors of <span class="math inline">\(s\)</span> that are “good”,</li>
+<li><span class="math inline">\(S^b \subset \S\)</span> is the set of behaviors of <span class="math inline">\(s\)</span> that are “bad”, and</li>
+<li><span class="math inline">\(\alpha \geq 0\)</span> and <span class="math inline">\(\beta \geq 0\)</span> are error tolerances, such that</li>
+<li>the false-fail rate is low: if <span class="math inline">\(s \in S^g\)</span>, then <span class="math inline">\(p(\tau(s) = \text{False}) \leq \alpha\)</span>, and</li>
+<li>the false-pass rate is low: if <span class="math inline">\(s \in S^b\)</span>, then <span class="math inline">\(p(\tau(s) = \text{True})  \leq \beta\)</span>.</li>
+</ul>
+<p>For example, consider the situation from <a href="../../2016/on-testing-probabilistic-programs/">my previous post on the
+subject</a>: <span class="math inline">\(s\)</span> performs
+some unknown computation and “fails” with unknown probability <span class="math inline">\(\pf\)</span>.
+In this case, the number <span class="math inline">\(\pf\)</span> completely characterizes the behavior
+of <span class="math inline">\(s\)</span> that we are interested in, so <span class="math inline">\(\S = [0,1]\)</span>. We wish to bound
+<span class="math inline">\(\pf\)</span>, so we set <span class="math inline">\(S^g = [0, 0.1]\)</span>. Suppose our test procedure <span class="math inline">\(\tau\)</span>
+is “Execute <span class="math inline">\(s\)</span> independently <span class="math inline">\(n = 10\)</span> times, and pass if <span class="math inline">\(s\)</span> ‘fails’
+at most 3 of them, inclusive.” Then it’s easy enough to compute that
+<span class="math inline">\(\alpha \geq 0.0128\)</span> will satisfy the false-fail rate equation. There
+are many choices of <span class="math inline">\(S^b\)</span> and <span class="math inline">\(\beta\)</span> that will satisfy the false-pass
+rate equation for this choice of <span class="math inline">\(\tau\)</span>, one of which is <span class="math inline">\(S^b = [0.7,
+1], \beta = 0.011\)</span>. As one might imagine, increasing <span class="math inline">\(n\)</span> can let us
+decrease <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\beta\)</span>, and enlarge <span class="math inline">\(S^b\)</span>.</p>
+<p>Note that the above test only makes guarantees about the outcome of
+<span class="math inline">\(\tau\)</span> if <span class="math inline">\(\pf &lt; 0.1\)</span> or <span class="math inline">\(\pf &gt; 0.7\)</span>, but says nothing for the
+intervening interval. This is a general phenomenon, because
+<span class="math inline">\(p(\tau(s) = True)\)</span> is continuous in the tested behavior <span class="math inline">\(s\)</span>.
+Ergo, if <span class="math inline">\(\alpha + \beta &lt; 1\)</span>, the sets <span class="math inline">\(S^g\)</span> and <span class="math inline">\(S^b\)</span> must be
+separated. If <span class="math inline">\(S^g\)</span> and <span class="math inline">\(S^b\)</span> are connected to each other in <span class="math inline">\(\S\)</span>,
+this implies incomplete coverage: <span class="math inline">\(S^g \cup S^b \subsetneq \S\)</span>.</p>
+<p>There are two symmetric ways to think about this gap. One is to say
+that we, in testing <span class="math inline">\(s\)</span>, know what behavior <span class="math inline">\(S^g\)</span> is acceptable. In
+this case, everything else is a “bug” which we would ideally like to
+distinguish from <span class="math inline">\(S^g\)</span>, but, unless <span class="math inline">\(S^g\)</span> is both closed and open in <span class="math inline">\(\S\)</span>, we can’t. So
+we settle for defining <span class="math inline">\(S^b\)</span> to be the bugs that are “severe enough”
+that we commit to finding them. In so doing, we balance coverage (a
+large <span class="math inline">\(S^b\)</span>) against confidence (small <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\beta\)</span>), and
+against the computational cost of <span class="math inline">\(\tau\)</span>.</p>
+<p>Symmetrically, we could say that we know what behavior <span class="math inline">\(S^b\)</span> is
+unacceptable, and define <span class="math inline">\(S^g\)</span> as the behaviors that are “obviously
+good” enough to commit to pronouncing them correct. On this view we
+are balancing the test’s robustness (large <span class="math inline">\(S^g\)</span>) against confidence
+and computation.</p>
+<h2 id="calibrated-test-suites">Calibrated test suites</h2>
+<p>So much for an isolated calibrated test. How can we compose these
+things? Like traditional (deterministic) unit tests, we can negate
+test assertions, and connect multiple assertions with “and” (or “or”).
+We just need to exercise some care with the resulting good/bad sets
+and error rates. Unlike tests of deterministic software, it is also
+meaningful to repeat a calibrated test, as a way of using computation
+to gain more confidence. Let’s work these out in reverse order.</p>
+<h3 id="amplifying-confidence">Amplifying confidence</h3>
+<p>We can generically trade computation for confidence by
+repeating a test independently more than once. Indeed, if <span class="math inline">\(T = (\tau, S^g,
+S^b, \alpha, \beta)\)</span> is any calibrated test, we can drive down
+the false-pass rate by forming <span class="math inline">\(T_\text{and}^k = (\tau^k_\text{and}, S^g, S^b, k\alpha,
+\beta^k)\)</span>. Here, <span class="math inline">\(\tau^k_\text{and}\)</span> is “Run
+<span class="math inline">\(\tau\)</span> independently <span class="math inline">\(k\)</span> times and return the logical ‘and’ of all the
+results.” The only way for <span class="math inline">\(\tau^k_\text{and}\)</span> to pass is if all <span class="math inline">\(k\)</span>
+runs of <span class="math inline">\(\tau\)</span> pass. If this is to be a false pass, i.e., if <span class="math inline">\(s\)</span> is
+actually in <span class="math inline">\(S^b\)</span>, the probability of each pass of <span class="math inline">\(\tau\)</span> is bounded
+by <span class="math inline">\(\beta\)</span>, which bounds the false-pass rate of <span class="math inline">\(\tau^k_\text{and}\)</span> by
+<span class="math inline">\(\beta^k\)</span>, as desired. However, the chance of a false-fail goes up:
+for <span class="math inline">\(\tau^k_\text{and}\)</span> to falsely fail, it suffices for at least one
+of the runs of <span class="math inline">\(\tau\)</span> to fail even though <span class="math inline">\(s \in S^g\)</span>. The
+probability of this happening is bounded by
+<span class="math display">\[ \text{if } s \in S^g\quad p(\tau^k_\text{and}(s) = \text{False}) \leq 1 - (1 - \alpha)^k \leq k\alpha. \]</span>
+The former inequality is tight if <span class="math inline">\(\alpha\)</span> was a tight bound on the
+false fail rate of <span class="math inline">\(\tau\)</span>, but the latter is generally conservative.
+However, it’s simple, and if <span class="math inline">\(k\alpha\)</span> is, as is usually desired, much
+less than <span class="math inline">\(1\)</span>, then the quadratic and higher terms in <span class="math inline">\((1 - \alpha)^k\)</span>
+are likely to be negligible.</p>
+<p>Symmetrically, we can drive down the false-fail rate by forming
+<span class="math inline">\(T_\text{or}^k = (\tau^k_\text{or}, S^g, S^b, \alpha^k, k\beta)\)</span>,
+where <span class="math inline">\(\tau^k_\text{or}\)</span> is “Run <span class="math inline">\(\tau\)</span> independently <span class="math inline">\(k\)</span> times and
+return the logical ‘or’ of all the results.” Since the error rate we
+are driving down falls exponentially while the other only climbs
+linearly, we can amplify any non-trivial initial calibrated test <span class="math inline">\(T\)</span> into one
+with arbitrarily small <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\beta\)</span>. (In fact, with a suitable
+“<span class="math inline">\(k\)</span> of <span class="math inline">\(m\)</span> passes” scheme, any initial error
+rates satisfying <span class="math inline">\(\alpha + \beta &lt; 1\)</span> are enough.)</p>
+<h3 id="composing-tests">Composing tests</h3>
+<p>The calibrated test formalism gets more interesting when we consider
+combining different tests. Suppose we have
+<span class="math inline">\(T_1 = (\tau_1, S^g_1, S^b_1, \alpha_1, \beta_1)\)</span> and
+<span class="math inline">\(T_2 = (\tau_2, S^g_2, S^b_2, \alpha_2, \beta_2)\)</span>. Then we can get a more
+specific test that’s still calibrated. Let <span class="math inline">\(\tau_1 \cdot \tau_2\)</span> be the
+testing procedure that runs <span class="math inline">\(\tau_1\)</span> and <span class="math inline">\(\tau_2\)</span> independently and returns
+the logical “and” of the answers. Then
+<span class="math display">\[ T_1 \cdot T_2 = (\tau_1 \cdot \tau_2, S^g_1 \cap S^g_2, S^b_1 \cup S^b_2, \alpha_1 + \alpha_2, \max(\beta_1, \beta_2)) \]</span>
+is a calibrated test. Why? If the software is good according to both
+<span class="math inline">\(T_1\)</span> and <span class="math inline">\(T_2\)</span>, the false fail rate is bounded by
+<span class="math display">\[ p((\tau_1 \cdot \tau_2)(s) = \text{False}) \leq 1 - (1 - \alpha_1)(1 - \alpha_2) \leq \alpha_1 + \alpha_2.\]</span></p>
+<p>Conversely, if the software is bad according to either <span class="math inline">\(T_1\)</span> or <span class="math inline">\(T_2\)</span>,
+then it has to obey one or the other false-pass rate equation, so
+<span class="math inline">\(\max(\beta_1, \beta_2)\)</span> bounds the overall false-pass rate.
+Note, by the way, that if we stick to the tight bound <span class="math inline">\(1 - (1 -
+\alpha_1)(1 - \alpha_2)\)</span> rather than the simple <span class="math inline">\(\alpha_1 + \alpha_2\)</span>,
+the <span class="math inline">\(\cdot\)</span> operation on tests becomes associative.</p>
+<p>What have we gained? By being a little careful with the confidences,
+we can form compound tests that ensure all of a set of desirable
+properties <span class="math inline">\(S^g_i\)</span> obtain together, or, equivalently, weed out any of
+a set of severe bugs <span class="math inline">\(S^b_i\)</span>. In other words, we can build up complex
+specifications of “correctness” by intersecting simpler specifications
+<span class="math inline">\(S^g_i\)</span>, while maintaining reasonable coverage through unioning the
+corresponding unacceptable sets <span class="math inline">\(S^b_i\)</span>. This is the basis on which
+developers of stochastic software <span class="math inline">\(s\)</span> can construct a test suite—if
+they take care to tighten the <span class="math inline">\(\alpha\)</span> bounds of the tests from time
+to time so that the <span class="math inline">\(\alpha\)</span> of the overall test suite stays within
+acceptable limits.</p>
+<p>For the record, the symmetric definition of <span class="math inline">\(\tau_1 + \tau_2\)</span> as the logical “or” of
+<span class="math inline">\(\tau_1\)</span> and <span class="math inline">\(\tau_2\)</span> gives us
+<span class="math display">\[ T_1 + T_2 = (\tau_1 + \tau_2, S^g_1 \cup S^g_2, S^b_1 \cap S^b_2, \max(\alpha_1, \alpha_2), \beta_1 + \beta_2), \]</span>
+which is a way of building up compound unacceptable behaviors by
+intersecting simpler ones.</p>
+<h3 id="negating-tests">Negating tests</h3>
+<p>Finally, no notion of a test suite is complete without the idea of a
+test that is known to fail, because of a known bug in the underlying
+software that just hasn’t been fixed yet. The corresponding concept
+here is test negation: given a calibrated test <span class="math inline">\(T = (\tau, S^g, S^b,
+\alpha, \beta)\)</span>, we can invert the sense of <span class="math inline">\(\tau\)</span> by running it once
+and negating the answer. The resulting <span class="math inline">\(\tilde \tau\)</span> gives the calibrated test
+<span class="math display">\[ \tilde T = (\tilde \tau, S^b, S^g, \beta, \alpha),\]</span>
+which makes the same distinction as <span class="math inline">\(T\)</span> with the same confidence,
+but with the reverse sense.</p>
+<p>This does not fully cover the role “expected failure” plays in
+deterministic testing. The latter has the property that if some test
+fails for an unknown reason that one does not currently have time to
+deal with, one can mark that test “expected failure”, get the test
+suite to pass that way, and then return to investigating the problem
+later. Negating a statistical test does not reliably obtain the same
+effect, because the software <span class="math inline">\(s\)</span> could be in the dead zone <span class="math inline">\(\S - (S^g
+\cup S^b)\)</span>, where neither <span class="math inline">\(T\)</span> nor <span class="math inline">\(\tilde T\)</span> will pass reliably.
+Sadly, there is nothing that can be done at the level of opaque
+calibrated tests in this situation. Perhaps a practical testing framework should
+have an additional marking whose effect is “run this test (to check
+that it completes without crashing) but ignore the answer” to
+accommodate this situation.</p>
+<h2 id="usable-tests">Usable tests</h2>
+<p>Let us now turn our attention to using this machinery to build the
+simplest actually usable calibrated tests: discrete equality in
+distribution. We will get two variants: the general version, where
+the “expected” distribution is itself given by a sampler, and a more
+efficient version where the “expected” distribution is an explicit
+list of objects and their probabilities. The latter is also called a
+“goodness of fit” test.</p>
+<p>The student of statistics will recognize that both of these tasks have
+well-known half-calibrated tests (the <span class="math inline">\(\chi^2\)</span> family is popular). I
+call the standard tests “half”-calibrated because, while their
+false-fail rates are well-understood, I am not aware of any
+characterization of their false-pass rates. The obstacle, presumably,
+is that such a characterization requires understanding the behavior of
+the test statistic for any possible “bad” state of the software under
+test.</p>
+<h3 id="a-building-block"><em>A</em> Building Block</h3>
+<p>Let us start with a two-sample inequality in probability test, as
+this will let us build both of our promised compound tests. To
+wit, suppose our software <span class="math inline">\(s\)</span> under test provides two operations,
+<span class="math inline">\(s_1\)</span> and <span class="math inline">\(s_2\)</span>, each of which returns true or false. We wish to
+check that <span class="math inline">\(p_1 = p(s_1 = \text{True}) \leq p_2 = p(s_2 = \text{True})\)</span>.</p>
+<p>Formally, our software <span class="math inline">\(s\)</span> is characterized completely by the two
+numbers <span class="math inline">\(p_1\)</span> and <span class="math inline">\(p_2\)</span>, so <span class="math inline">\(\S = [0,1] \times [0,1]\)</span>. Our desired
+“good” region is <span class="math inline">\(S^g = \{p_1 \leq p_2\}\)</span>. <span class="math inline">\(S^b\)</span> must be disconnected
+from <span class="math inline">\(S^g\)</span>, but it would be nice to have a parameter by which we can
+let it approach arbitrarily close; so let’s pick <span class="math inline">\(S^b = \{ p_1 \geq
+p_2 + \eps \}\)</span> for some <span class="math inline">\(\eps &gt; 0\)</span>.</p>
+<p>What can be do for a testing procedure <span class="math inline">\(\tau\)</span>? Not much, really. The
+simplest option<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> is to run <span class="math inline">\(s_1\)</span> some number <span class="math inline">\(n_1\)</span> times, run
+<span class="math inline">\(s_2\)</span> <span class="math inline">\(n_2\)</span> times, and count the numbers <span class="math inline">\(k_1\)</span> and <span class="math inline">\(k_2\)</span> that they
+respectively produce True. Having obtained those results, use some
+decision rule to emit True or False from the test as a function of
+<span class="math inline">\(k_1\)</span> and <span class="math inline">\(k_2\)</span>, and then calibrate <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\beta\)</span> by computing
+or bounding the probability of False if <span class="math inline">\(p_1 \leq p_2\)</span>, and of
+True if <span class="math inline">\(p_1 \geq p_2 + \eps\)</span>.</p>
+<p>I don’t have any special insight on the best way to choose such a
+decision rule, but here’s one that will do:
+<span class="math display">\[ \tau(n_1, n_2, \eps)(s) = \begin{cases} \text{True} &amp; \text{if } \frac{k_1}{n_1} \leq \frac{k_2}{n_2} + \frac{\eps}{2} \\
+  \text{False} &amp; \text{otherwise}. \end{cases} \]</span></p>
+<p>What false-fail rate does this have? Well, if <span class="math inline">\(s\)</span> is actually
+characterized by <span class="math inline">\(p_1, p_2\)</span>, then the probability of any given outcome <span class="math inline">\(k_1, k_2\)</span> is
+<span class="math display">\[ p(k_1, k_2|p_1, p_2) = {n_1 \choose k_1} p_1^{k_1} (1 - p_1)^{n_1 - k_1}
+  {n_2 \choose k_2} p_2^{k_2} (1 - p_2)^{n_2 - k_2}. \]</span>
+The probability of failure is the probability that any of the outcomes
+leading to False will occur, and the worst-case false-fail rate
+is that probability for the <span class="math inline">\(p_1 \leq p_2\)</span> that maximize it:
+<span class="math display">\[
+\begin{align*}
+ \alpha &amp; = \max_{p_1 \leq p_2} \left[ \sum_{\frac{k_1}{n_1} &gt; \frac{k_2}{n_2} + \frac{\eps}{2}}
+  {n_1 \choose k_1} p_1^{k_1} (1 - p_1)^{n_1 - k_1}
+  {n_2 \choose k_2} p_2^{k_2} (1 - p_2)^{n_2 - k_2} \right] \\
+ &amp; = \max_{p_1 \leq p_2}
+  \left[ \sum_{k_2} {n_2 \choose k_2} p_2^{k_2} (1 - p_2)^{n_2 - k_2}
+    \left( \sum_{\frac{k_1}{n_1} &gt; \frac{k_2}{n_2} + \frac{\eps}{2}}
+      {n_1 \choose k_1} p_1^{k_1} (1 - p_1)^{n_1 - k_1}
+    \right) \right]. \\
+\end{align*}
+\]</span></p>
+<p>The inner sum is convenient, being the survivor function of the
+binomial distribution of <span class="math inline">\(n_1\)</span> trials with success rate <span class="math inline">\(p_1\)</span>. Since
+the binomial survivor function is at every point monotonic in the
+success probability, it’s safe to say that for any given <span class="math inline">\(p_2\)</span>, the
+maximum over <span class="math inline">\(p_1\)</span> is at the highest value admissible by the
+constraint, in this case <span class="math inline">\(p_1 = p_2\)</span>. This reduces our optimization
+problem to one dimension.</p>
+<p>The false-pass rate is similar:
+<span class="math display">\[ \beta = \max_{p_1 \geq p_2 + \eps}
+  \left[ \sum_{k_2} {n_2 \choose k_2} p_2^{k_2} (1 - p_2)^{n_2 - k_2}
+    \left( \sum_{\frac{k_1}{n_1} \leq \frac{k_2}{n_2} + \frac{\eps}{2}}
+      {n_1 \choose k_1} p_1^{k_1} (1 - p_1)^{n_1 - k_1}
+    \right) \right], \]</span>
+with a similar simplification due to the inner sum being a binomial
+cumulative distribution function, which is maximized by minimizing
+<span class="math inline">\(p_1\)</span>.</p>
+<p>The above optimizations are not very hard to solve. Here are a few
+computed error rates for tests with given <span class="math inline">\(\eps\)</span>, <span class="math inline">\(n_1\)</span>, and <span class="math inline">\(n_2\)</span>
+parameters:</p>
+<table>
+<thead>
+<tr>
+<th><span class="math inline">\(\eps\)</span></th>
+<th><span class="math inline">\(n_1\)</span></th>
+<th><span class="math inline">\(n_2\)</span></th>
+<th><span class="math inline">\(\alpha\)</span></th>
+<th style="text-align: left;"><span class="math inline">\(\beta\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.20</td>
+<td>30</td>
+<td>30</td>
+<td>0.183155</td>
+<td style="text-align: left;">0.253557</td>
+</tr>
+<tr>
+<td>0.20</td>
+<td>100</td>
+<td>100</td>
+<td>0.072367</td>
+<td style="text-align: left;">0.082141</td>
+</tr>
+<tr>
+<td>0.20</td>
+<td>200</td>
+<td>200</td>
+<td>0.020901</td>
+<td style="text-align: left;">0.023023</td>
+</tr>
+<tr>
+<td>0.20</td>
+<td>271</td>
+<td>271</td>
+<td>0.009036</td>
+<td style="text-align: left;">0.009910</td>
+</tr>
+<tr>
+<td>0.10</td>
+<td>30</td>
+<td>30</td>
+<td>0.349442</td>
+<td style="text-align: left;">0.347353</td>
+</tr>
+<tr>
+<td>0.10</td>
+<td>100</td>
+<td>100</td>
+<td>0.218377</td>
+<td style="text-align: left;">0.260811</td>
+</tr>
+<tr>
+<td>0.10</td>
+<td>300</td>
+<td>300</td>
+<td>0.102815</td>
+<td style="text-align: left;">0.117143</td>
+</tr>
+<tr>
+<td>0.10</td>
+<td>1000</td>
+<td>1000</td>
+<td>0.011947</td>
+<td style="text-align: left;">0.013132</td>
+</tr>
+<tr>
+<td>0.10</td>
+<td>1085</td>
+<td>1085</td>
+<td>0.009634</td>
+<td style="text-align: left;">0.009974</td>
+</tr>
+<tr>
+<td>0.05</td>
+<td>30</td>
+<td>30</td>
+<td>0.448711</td>
+<td style="text-align: left;">0.397353</td>
+</tr>
+<tr>
+<td>0.05</td>
+<td>100</td>
+<td>100</td>
+<td>0.361886</td>
+<td style="text-align: left;">0.361332</td>
+</tr>
+<tr>
+<td>0.05</td>
+<td>300</td>
+<td>300</td>
+<td>0.270163</td>
+<td style="text-align: left;">0.269769</td>
+</tr>
+<tr>
+<td>0.05</td>
+<td>1000</td>
+<td>1000</td>
+<td>0.127058</td>
+<td style="text-align: left;">0.136325</td>
+</tr>
+<tr>
+<td>0.05</td>
+<td>3000</td>
+<td>3000</td>
+<td>0.025816</td>
+<td style="text-align: left;">0.026889</td>
+</tr>
+<tr>
+<td>0.05</td>
+<td>4334</td>
+<td>4334</td>
+<td>0.009880</td>
+<td style="text-align: left;">0.009995</td>
+</tr>
+</tbody>
+</table>
+<h3 id="two-sample-equality-in-distribution">Two-sample equality <em>in</em> distribution</h3>
+<p>With that capability in hand, we can now ask for something practically
+usable that I don’t know any other way to get: a calibrated test that
+two discrete samplers are sampling from the same distribution. To
+wit, suppose <span class="math inline">\(s\)</span> now consists of two programs <span class="math inline">\(s_1\)</span> and <span class="math inline">\(s_2\)</span>, each of
+which randomly emits one of <span class="math inline">\(D\)</span> tokens. We wish to test that <span class="math inline">\(s_1\)</span>
+and <span class="math inline">\(s_2\)</span> have the same probability of emitting each token.</p>
+<p>This can be accomplished with a conjunction of <span class="math inline">\(D\)</span> of the two-sample
+inequality tests described above: just assert that the probability of
+<span class="math inline">\(s_1\)</span> generating each token <span class="math inline">\(d\)</span> is no more than the probability of
+<span class="math inline">\(s_2\)</span> generating the same token:
+<span class="math display">\[ \text{And}_{d \in D} \big[p(s_1 = d) \leq p(s_2 = d)\big]. \]</span>
+The reverse inequalities follow by conservation of belief—the
+total probability in both distributions must be 1.</p>
+<p>One could use this to, for example, design a calibrated unit test for,
+say, a Chinese Restaurant Process sampler. The CRP is a probability
+distribution on partitions. There are 18 possible partitions of a set
+of 4 distinct objects into clusters. So, one could design a unit test
+that checks whether two purported samplers for the CRP distribution on 4 objects in
+fact agree. In this style, that test would check, independently for
+each of the 18 possible partitions, that the probability of drawing
+that one from program 1 is no more than the probability of drawing it
+from program 2. If one designed each test to make <span class="math inline">\(n\)</span> trials, one
+would need <span class="math inline">\(18n\)</span> trials in total, and, using the above
+single-inequality procedure, one could obtain the following
+computation-precision-confidence trade off:</p>
+<table>
+<thead>
+<tr>
+<th><span class="math inline">\(\eps\)</span></th>
+<th style="text-align: left;"><span class="math inline">\(n\)</span></th>
+<th style="text-align: left;"><span class="math inline">\(18n\)</span></th>
+<th><span class="math inline">\(\alpha\)</span></th>
+<th style="text-align: left;"><span class="math inline">\(\beta\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.20</td>
+<td style="text-align: left;">30</td>
+<td style="text-align: left;">540</td>
+<td>0.973787</td>
+<td style="text-align: left;">0.253557</td>
+</tr>
+<tr>
+<td>0.20</td>
+<td style="text-align: left;">100</td>
+<td style="text-align: left;">1800</td>
+<td>0.741313</td>
+<td style="text-align: left;">0.082141</td>
+</tr>
+<tr>
+<td>0.20</td>
+<td style="text-align: left;">300</td>
+<td style="text-align: left;">5400</td>
+<td>0.109433</td>
+<td style="text-align: left;">0.007154</td>
+</tr>
+<tr>
+<td>0.20</td>
+<td style="text-align: left;">530</td>
+<td style="text-align: left;">9540</td>
+<td>0.009010</td>
+<td style="text-align: left;">0.000531</td>
+</tr>
+<tr>
+<td>0.10</td>
+<td style="text-align: left;">30</td>
+<td style="text-align: left;">540</td>
+<td>0.999564</td>
+<td style="text-align: left;">0.347353</td>
+</tr>
+<tr>
+<td>0.10</td>
+<td style="text-align: left;">100</td>
+<td style="text-align: left;">1800</td>
+<td>0.988144</td>
+<td style="text-align: left;">0.260811</td>
+</tr>
+<tr>
+<td>0.10</td>
+<td style="text-align: left;">300</td>
+<td style="text-align: left;">5400</td>
+<td>0.858134</td>
+<td style="text-align: left;">0.117143</td>
+</tr>
+<tr>
+<td>0.10</td>
+<td style="text-align: left;">1000</td>
+<td style="text-align: left;">18000</td>
+<td>0.194546</td>
+<td style="text-align: left;">0.013132</td>
+</tr>
+<tr>
+<td>0.10</td>
+<td style="text-align: left;">2120</td>
+<td style="text-align: left;">38160</td>
+<td>0.009576</td>
+<td style="text-align: left;">0.000572</td>
+</tr>
+<tr>
+<td>0.05</td>
+<td style="text-align: left;">30</td>
+<td style="text-align: left;">540</td>
+<td>0.999978</td>
+<td style="text-align: left;">0.397353</td>
+</tr>
+<tr>
+<td>0.05</td>
+<td style="text-align: left;">100</td>
+<td style="text-align: left;">1800</td>
+<td>0.999692</td>
+<td style="text-align: left;">0.361332</td>
+</tr>
+<tr>
+<td>0.05</td>
+<td style="text-align: left;">300</td>
+<td style="text-align: left;">5400</td>
+<td>0.996548</td>
+<td style="text-align: left;">0.269769</td>
+</tr>
+<tr>
+<td>0.05</td>
+<td style="text-align: left;">1000</td>
+<td style="text-align: left;">18000</td>
+<td>0.913356</td>
+<td style="text-align: left;">0.136325</td>
+</tr>
+<tr>
+<td>0.05</td>
+<td style="text-align: left;">3000</td>
+<td style="text-align: left;">54000</td>
+<td>0.375490</td>
+<td style="text-align: left;">0.026889</td>
+</tr>
+<tr>
+<td>0.05</td>
+<td style="text-align: left;">8480</td>
+<td style="text-align: left;">152640</td>
+<td>0.009889</td>
+<td style="text-align: left;">0.000573</td>
+</tr>
+</tbody>
+</table>
+<p>If those trial runs look a bit large, there are couple reasons:</p>
+<ul>
+<li><p>Each individual test of the 18 is pessimistic, guaranteeing its
+error rates even if the probability of that particular partition is
+the most confusing possible, namely close to 1/2. But, of course,
+they can’t all be close to 1/2. A directly synthetic test like the
+<span class="math inline">\(\chi^2\)</span> test of independence is likely to be much more efficient.
+Learning how to calibrate its false pass rate would be a useful
+advance.</p></li>
+<li><p>Relatedly, the design outlined here wastes computation on assuring
+the independence of the individual tests. Namely, when one is
+measuring the frequency of some partition, one could presumably use
+those samples to measure the frequency of each of the 17 others as
+well. I think it would be fruitful to think through what
+restrictions, if any, there are on sharing samples across tests of
+different facets of the same sampler.</p></li>
+<li><p>In this particular design, I arbitrarily chose that <span class="math inline">\(\tau(n_1, n_2, \eps)
+= \text{True}\)</span> when <span class="math inline">\(k_1/n_1 \leq k_2/n_2 + \eps/2\)</span>. That threshold
+balances the false fail and false pass rates for each individual
+test, but the compound test, being an “and”, has a substantially
+higher false fail rate than each component, but the same false pass
+rate. Therefore, some more efficiency can be obtained by making the
+threshold larger than <span class="math inline">\(k_2/n_2 + \eps/2\)</span>. That way, the computation
+used to ensure the false fail rate is acceptable is not wasted on
+driving the false pass rate lower than needed.</p></li>
+</ul>
+<h3 id="one-sample-equality-in-distribution">One-sample Equality <em>in</em> Distribution</h3>
+<p>We can actually gain a lot of computational efficiency if we know the
+expected distribution analytically. Then we can use a one-sample test
+on each dimension, and save many trials by not having to account for
+too many hard-to-assess probabilities that are near 0.5.</p>
+<p>In the case of the Chinese Restaurant Process, the analytic
+distribution on partitions is known. For example, if the
+concentration parameter is 0.5, the 18 partitions have these
+probabilities:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Partition</th>
+<th style="text-align: left;">Probability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">[1, 1, 1, 1]</td>
+<td style="text-align: left;">0.457142857143</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 1, 1, 2]</td>
+<td style="text-align: left;">0.0761904761905</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 1, 2, 1]</td>
+<td style="text-align: left;">0.0761904761905</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 1, 2, 2]</td>
+<td style="text-align: left;">0.0380952380952</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 1, 2, 3]</td>
+<td style="text-align: left;">0.0190476190476</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 2, 1, 1]</td>
+<td style="text-align: left;">0.0761904761905</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 2, 1, 2]</td>
+<td style="text-align: left;">0.0380952380952</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 2, 1, 3]</td>
+<td style="text-align: left;">0.0190476190476</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 2, 2, 1]</td>
+<td style="text-align: left;">0.0380952380952</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 2, 2, 2]</td>
+<td style="text-align: left;">0.0761904761905</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 2, 2, 3]</td>
+<td style="text-align: left;">0.0190476190476</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 2, 3, 1]</td>
+<td style="text-align: left;">0.0190476190476</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 2, 3, 2]</td>
+<td style="text-align: left;">0.0190476190476</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 2, 3, 3]</td>
+<td style="text-align: left;">0.0190476190476</td>
+</tr>
+<tr>
+<td style="text-align: left;">[1, 2, 3, 4]</td>
+<td style="text-align: left;">0.00952380952381</td>
+</tr>
+</tbody>
+</table>
+<p>Using the one-sample test design function from <a href="../../2016/on-testing-probabilistic-programs/">my previous
+post</a>, we can design 18
+tests corresponding to these probabilities. These designs will
+naturally spend less computation on the low-probability partitions,
+because those are easier to reliably falsify. With that design, we
+can get to <span class="math inline">\(0.01\)</span> error rates with these total trial counts:</p>
+<table>
+<thead>
+<tr>
+<th><span class="math inline">\(\eps\)</span></th>
+<th>Trials</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0.2</td>
+<td>1244</td>
+</tr>
+<tr>
+<td>0.1</td>
+<td>3894</td>
+</tr>
+<tr>
+<td>0.05</td>
+<td>12813</td>
+</tr>
+</tbody>
+</table>
+<p>A dramatic improvement over the two-sample situation.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>I think the composable structure of calibrated tests forms a
+sufficient backbone for an intellectually sound unit testing framework
+for stochastic software. Of course, a few more things do need to be
+worked out before one can become practical. Some come to mind
+offhand:</p>
+<ol type="1">
+<li><p>It would be nice to get more efficient calibrated tests (perhaps in
+the <span class="math inline">\(\chi^2\)</span> style) for equality in distribution than those
+presented here. I just started with these to prove that it could
+be done, and to demonstrate how the compositions tend to work out.</p></li>
+<li><p>Continuous distributions can be attacked by binning, but it would
+be more satisfying to calibrate something like the
+<a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test">Kolmogorov-Smirnov</a>
+test.</p></li>
+<li><p>Any library would do well to provide tests of nearness (as opposed
+to equality) in distribution, with the distance bound given either
+as an explicit number or implicitly as the distance between two
+other distributions. This should be particularly useful for
+testing approximate inference algorithms, which promise only to
+move a distribution toward a goal, not to actually get there.
+Designing such tests directly could be substantially more efficient
+than composing them out of 1-D probability inequalities.</p></li>
+<li><p>There is an interesting design space of continuous integration
+tools, since now there is confidence to be gained by rerunning a
+test that already passed, or increasing its computation budget
+internally.</p></li>
+<li><p>I’ve presented forward computations, deriving the best obtainable
+error bounds from a given test procedure. I think a tool could
+become substantially more practical if it automated the experiment
+design problem: The user tells the framework the <span class="math inline">\(S^g, S^b,
+\alpha\)</span>, and <span class="math inline">\(\beta\)</span> they want, and the framework finds parameters
+for the testing procedure(s) <span class="math inline">\(\tau\)</span> to meet those requirements
+while using as little computation as it can. This becomes very
+interesting when compound tests are involved, because the framework
+could (within limits) squeeze more confidence out of cheaper
+individual tests, and go a bit easier on expensive ones, and still
+get its overall error rate bounds.</p></li>
+</ol>
+<p>But, that’s all!</p>
+<h2 id="notes">Notes</h2>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script type="text/javascript">
+MathJax.Hub.Config({
+  TeX: {
+    Macros: {
+      S: "{\\mathbb{S}}",
+      bool: "{\\mathbb{B}}",
+      pf: "p_{\\text{fail}}",
+      and: "\\text{and}",
+      eps: "\\varepsilon"
+    }
+  }
+});
+</script>
+<section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Not the only option, as one can imagine choosing <span class="math inline">\(n_1\)</span> and
+<span class="math inline">\(n_2\)</span> dynamically, as results from previous trials come in. Such a
+technique may be a way to save computation, but a sound analysis is
+beyond the scope of this blog post.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+  </div>
+
+  <footer>
+    <div class="metadata">
+    </div>
+    <div class="nav-back">
+      <a href="../../../" title>← Conversations index</a>
+    </div>
+  </footer>
+</article>
+
+      </div><!-- #content -->
+    </div><!-- #container -->
+
+    <div id="footer">
+    </div><!-- #footer -->
+  </div><!-- #wrapper .hfeed -->
+</body>
+</html>

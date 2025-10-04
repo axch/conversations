@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href="https://fonts.googleapis.com/css?family=Merriweather+Sans:800,400italic|Inconsolata:400|Merriweather:400,400italic" rel="stylesheet" type="text/css">
+
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta content="width=device-width" name="viewport">
+  <title>Musings on Probprog</title>
+
+  
+  <meta name="author" content="Alexey Radul" />
+  
+
+  <link rel="stylesheet" type="text/css" href="../../../css/erudite.css" />
+  <link rel="icon" href="../../../favicon.ico" />
+  <link rel="alternate" type="application/rss+xml" title="Conversations Updates -- RSS" href="../../../feed.xml" />
+  
+</head>
+
+<body>
+
+  <div id="wrapper" class="hfeed">
+    <div id="header-wrap">
+      <div id="header" role="banner">
+        <h1 id="blog-title"><span><a href="../../../" title rel="home">Conversations</a></span></h1>
+        <div id="blog-description"></div>
+      </div><!--  #header -->
+      <div id="access" role="navigation">
+        <div class="skip-link"><a href="#content" title></a></div>
+      </div><!-- #access -->
+    </div><!--  #header-wrap -->
+
+    <div id="container">
+      <div id="content" role="main">
+        <article class="hentry" itemscope itemtype="http://schema.org/BlogPosting">
+  
+  <header>
+    <h2 class="entry-title" itemprop="name">Musings <em>on</em> Probprog</h2>
+  </header>
+
+  <div class="entry-meta">
+
+    <span class="entry-date">
+      <abbr class="published">August  7, 2017</abbr>
+    </span>
+    <span class="author vcard">
+      By Alexey Radul
+    </span>
+  </div>
+
+  <div class="entry-content" itemprop="articleBody">
+    <p>People in my circles periodically talk and write about the nature of
+this emerging new beast that is called probabilistic programming.
+There’s various talk about how it’s about samplers, or density
+functions, or Markov chains, or making machine learning or artificial
+intelligence more accessible, or various other such stuff. Certainly
+those things hover in the air around probabilistic programming, but I don’t
+think that gets to the essence of it. I think that
+probabilistic programming, as opposed to standard programming, is a
+new scope of problems that can be solved by computing.</p>
+<style>
+.entry-content dl dt {
+  font-weight: bold;
+  display: inline;
+  margin-left: 0px;
+  float: left;
+  text-indent: 0px;
+  margin-bottom: 0px;
+  margin-right: 0.5em;
+}
+
+.entry-content dl dd {
+  margin-left: 0px;
+}
+
+</style>
+<p>This new scope
+is obtained by relaxing what it means for a problem to be “solved”.
+To wit, a problem like “Consider a hypothetical Earth satellite in
+geosynchronous orbit, weighing 500 kg. What country plausibly
+launched it and why?” has no definite “answer”. Yet, in the presence
+of a model of satellites, computation may be applied and plausible
+(and, one hopes, useful) candidates (e.g., “It could be a US
+communications satellite”) may be generated.</p>
+<p>To me, this shift is analogous to my college experience of shifting
+from studying math to studying computers. The standard I learned
+from the math department for what constitutes a “solution” was the presence
+of a clear, understandable, and communicable answer, supported by a
+(potentially very difficult or obscure) proof of its correctness. The
+Fermat-Wiles theorem provides a spectacular example: For what integers
+<span class="math inline">\(n &gt; 0\)</span> are there any triples of positive integers <span class="math inline">\(x\)</span>, <span class="math inline">\(y\)</span>, and <span class="math inline">\(z\)</span>
+such that <span class="math inline">\(x^n + y^n = z^n\)</span>? The answer is simple and clear:
+<span class="math inline">\(n \leq 2\)</span>. The proof is an eighty-page book about elliptic curves that
+not many people in the world can read, but the problem is considered
+solved.</p>
+<p>The standard of solution I learned from the computer science
+department is different: a problem is solved when there is a program
+that computes the answer acceptably quickly. It is necessary to trust
+or verify that the program is correct, but it is not necessary to be
+able to predict its output on any given instance. The problem of
+finding the shortest path from one node of a network to another
+is classic. Even though someone can hand me a network in which I
+won’t be able to intuit shortest paths, I nonetheless consider the
+problem solved (as a computational problem) because effective
+algorithms are well-disseminated and high quality implementations are
+available.</p>
+<p>In some sense, the computational standard is a relaxation of the
+mathematical one. An answer that the mathematicians consider good
+looks to the CS people like an extremely fast program—much faster
+than necessary. And so the scope of addressable problems broadens.
+Computer programming offers attacks on all sorts of problems that
+simply do not have simple, understandable answers.</p>
+<p>The relationship between classical and probabilistic programming seems
+similar to me. A “normal” program computes an answer. As a
+probability distribution, this has zero entropy—much less than
+strictly necessary, from the probprog lens. And so the scope,
+similarly, broadens, to problems like our satellite that simply
+do not have definite answers.</p>
+<p>So what is the shape of this new scope of attackable problems? What
+do the solutions look like? The common characteristic of the problems is
+the presence of modelable uncertainty. That’s why it’s called
+“probabilistic”: probability theory serves as the framework in which
+to approach uncertainties in one’s problem with computational objects.</p>
+<p>As for solutions, and the internal workings of the discipline, I can
+name several relatively novel features:</p>
+<dl>
+<dt>
+Uncertainty in, uncertainty out.
+</dt>
+<dd>
+Imprecisely posed questions
+necessarily have imprecise answers. It <em>could</em> be a US
+communications satellite; it could be a Chinese one too, though
+perhaps that’s less likely. The “solution” to such a problem, then,
+is (a program that samples from) a probability distribution on
+possible answers.
+</dd>
+<dt>
+Knowable unknowns.
+</dt>
+<dd>
+Generally, the uncertainty within a given model
+of a given situation can be characterized. For instance, the
+meta-question “What is the probability (in this model) that it’s a
+US communications satellite?” does have a definite answer. Such
+answers are often intractable to compute to full floating-point
+precision, but can always be approximated arbitrarily well with
+sufficient computation.
+(The <a href="https://en.wikipedia.org/wiki/Central_limit_theorem">Central Limit Theorem</a> guarantees
+<span class="math inline">\(O(\sqrt{N})\)</span> accuracy for <span class="math inline">\(O(N)\)</span> computation for many questions,
+including probabilities.) There are, of course, also many such
+probability questions to which the exact answer is known.
+</dd>
+<dt>
+New problems, new tactics.
+</dt>
+<dd>
+Expanding the space of approachable
+problems has the side-effect of expanding the space of valid
+subproblems. This, in turn, expands the universe of tactics by
+which problems may be decomposed and solved. For instance, instead
+of directly forming a probabilistic model of 500-kg satellites in
+geosynchronous orbit, or even of the Earth satellites that exist, we
+can form a probabilistic model of possible structures for a domain
+of satellites. If we then ask that model “How is the true satellite
+domain plausibly structured, in light of this data set about real
+satellites?”, answers to that question can become models of the
+extant Earth satellites, which can then be queried for inferences
+about origin and purpose from mass and orbit class. It often turns out
+that this indirection is actually an easier path to decent answers
+for the original question.
+</dd>
+<dt>
+Inverse reasoning.
+</dt>
+<dd>
+A specific problem template to which probability
+applies very well is “Here is an uncertain model of a causal
+process; here is an observed result; how might the process have gone
+to produce it?” The problem is formalized as conditioning the joint
+distribution over cause-result pairs on the observed result. There
+is no acceptably efficient general solution, but many usable
+(usually approximate) methods have been developed. This template is
+fruitful enough that many authors view it as paradigmatic of the
+entire field.
+</dd>
+<dt>
+All models are wrong, but some are useful.
+</dt>
+<dd>
+It seems, looking at the
+practice of probabilistic problem solving, that it tolerates more
+severe, or at least more explicit, gaps between the real-world
+problems it attacks and the models with which it attacks them than
+classical programming does. Perhaps this is because uncertainty is
+already present within the formalism, so the uncertainty in the
+model-reality gap falls under some of the same quality assurance
+processes as the in-model uncertainty does.
+</dd>
+<dt>
+Robustness.
+</dt>
+<dd>
+An interesting side-effect of models that explicitly
+admit uncertainty is that they can often “go with the flow” if
+something unexpected happens. If the data fails to conform to the
+model, the model just concludes that there must have been a lot of
+noise, and makes the best of it. This both makes it easier to get
+useful results about a new situation than traditional programming,
+and harder to diagnose errors in model specification.
+</dd>
+<dt>
+Natural approximation.
+</dt>
+<dd>
+To the extent that “a sample from a
+probability distribution”, or “a sampler for a probability
+distribution”, constitutes a solution to a problem, the probability
+paradigm admits a new natural notion of approximation. To wit, a
+sample or a sampler may often still be acceptable if its
+distribution is merely close (in, say, Kullback-Leibler divergence)
+to the “exact” distribution. Many probabilistic techniques
+naturally trade computational cost for nearness of approximation;
+much effort can sometimes be saved by not making the approximation
+gap very much smaller than the model-reality gap.
+</dd>
+<dt>
+Squishy Testing.
+</dt>
+<dd>
+Testing a probabilistic program is <a href="../../2016/on-testing-probabilistic-programs">squishier</a>.
+After all, even a correct program can produce arbitrarily weird
+results by sheer chance, as can an incorrect program produce
+plausible results by sheer chance. So the testing is also a
+probabilistic activity, though generally its error can be driven
+down by computation.
+</dd>
+<p>What, then, is probabilistic programming? It is the practice of
+applying computation to generate probabilistic solutions to
+probabilistically posed problems. It is also the practice of making
+(software) agents that operate in light of a capability to solve such
+problems.</p>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script type="text/javascript">
+MathJax.Hub.Config({
+  TeX: {
+    equationNumbers: { autoNumber: "AMS" },
+    noErrors: { disabled: true },
+  }
+});
+</script>
+  </div>
+
+  <footer>
+    <div class="metadata">
+    </div>
+    <div class="nav-back">
+      <a href="../../../" title>← Conversations index</a>
+    </div>
+  </footer>
+</article>
+
+      </div><!-- #content -->
+    </div><!-- #container -->
+
+    <div id="footer">
+    </div><!-- #footer -->
+  </div><!-- #wrapper .hfeed -->
+</body>
+</html>

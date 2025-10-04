@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href="https://fonts.googleapis.com/css?family=Merriweather+Sans:800,400italic|Inconsolata:400|Merriweather:400,400italic" rel="stylesheet" type="text/css">
+
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta content="width=device-width" name="viewport">
+  <title>Stochasticity is a Quantifier</title>
+
+  
+  <meta name="author" content="Alexey Radul" />
+  
+
+  <link rel="stylesheet" type="text/css" href="../../../css/erudite.css" />
+  <link rel="icon" href="../../../favicon.ico" />
+  <link rel="alternate" type="application/rss+xml" title="Conversations Updates -- RSS" href="../../../feed.xml" />
+  
+  <link href="https://fonts.googleapis.com/css?family=Open+Sans:300&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+</head>
+
+<body>
+
+  <div id="wrapper" class="hfeed">
+    <div id="header-wrap">
+      <div id="header" role="banner">
+        <h1 id="blog-title"><span><a href="../../../" title rel="home">Conversations</a></span></h1>
+        <div id="blog-description"></div>
+      </div><!--  #header -->
+      <div id="access" role="navigation">
+        <div class="skip-link"><a href="#content" title></a></div>
+      </div><!-- #access -->
+    </div><!--  #header-wrap -->
+
+    <div id="container">
+      <div id="content" role="main">
+        <article class="hentry" itemscope itemtype="http://schema.org/BlogPosting">
+  
+  <header>
+    <h2 class="entry-title" itemprop="name">Stochasticity <em>is a</em> Quantifier</h2>
+  </header>
+
+  <div class="entry-meta">
+
+    <span class="entry-date">
+      <abbr class="published">May 13, 2014</abbr>
+    </span>
+    <span class="author vcard">
+      By Alexey Radul
+    </span>
+  </div>
+
+  <div class="entry-content" itemprop="articleBody">
+    <p>In English, quantifiers are words like “all”, “one”, or “some” that
+indicate how broadly true the quantified clause is. Formal logic has
+adopted symbols for such words, namely “all”, “exactly one”, and
+“some” (in the sense of “at least one”). Probability theory offers us
+a reason to incorporate another symbol, with a meaning along
+the lines of “some, and I have a sense of how to find them”.</p>
+<p>I want to present the notation, justify it as a coherent and uniform
+extension of classic logical practice, and use it to explain something
+I understood much less clearly before: the nature of the distinction
+between frequentist and Bayesian statistics, specifically on the
+example of comparing confidence intervals to credibility intervals.</p>
+<h2 id="contents">Contents</h2>
+<ol type="1">
+<li><a href="#formulae">Formulae</a>
+<ol type="1">
+<li><a href="#from-logic-to-games">From Logic to Games</a></li>
+<li><a href="#the-random-player">The Random Player</a></li>
+<li><a href="#back-to-logic">Back to Logic</a></li>
+<li><a href="#summary">Summary</a></li>
+</ol></li>
+<li><a href="#statistics">Statistics</a>
+<ol type="1">
+<li><a href="#frequentist">Frequentist</a></li>
+<li><a href="#bayesian">Bayesian</a></li>
+<li><a href="#comparison">Comparison</a></li>
+</ol></li>
+<li><a href="#reflection">Reflection</a></li>
+<li><a href="#notes">Notes</a></li>
+</ol>
+<h2 id="formulae">Formulae</h2>
+<h3 id="from-logic-to-games"><em>From</em> Logic <em>to</em> Games</h3>
+<p><a href="https://en.wikipedia.org/wiki/Game_semantics">Logic can be embedded into game theory</a>. A
+(closed) logical formula with quantifiers (in <a href="https://en.wikipedia.org/wiki/Prenex_normal_form">prenex form</a>) can be taken to be
+a two-player
+zero-sum game where I choose a value for every exists-quantified
+variable and my adversary chooses
+a value for every forall-quantified variable. I win if
+the quantifier-free part ends up being true,
+and the adversary wins if the quantifier-free part ends up being false.
+The order of making choices and the information available to each
+player has to follow quantifier scope. In this embedding, we call
+a quantified formula “True” if I win this game under perfect play, and
+“False” if the adversary does.<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>
+<p>For example, the formula
+<span class="math display">\[ \forall k \in \Z. \exists n \in \Z. n &gt; k \]</span>
+is the game</p>
+<ol type="1">
+<li>Adversary chooses an integer <span class="math inline">\(k\)</span> (not knowing <span class="math inline">\(n\)</span>)</li>
+<li>I choose an integer <span class="math inline">\(n\)</span> (knowing <span class="math inline">\(k\)</span>)</li>
+<li>I win if <span class="math inline">\(n &gt; k\)</span>, adversary wins if not <span class="math inline">\(n &gt; k\)</span>.</li>
+</ol>
+<p>Since we are playing over the integers, this game is one I can
+always win, which is the same as saying that this formula is true.</p>
+<p>The order of quantification, or in other words the order of choices in
+the game,<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a> matters—the formula
+<span class="math display">\[  \exists n \in \Z. \forall k \in \Z. n &gt; k \]</span>
+is the game</p>
+<ol type="1">
+<li>I choose an integer <span class="math inline">\(n\)</span> (not knowing <span class="math inline">\(k\)</span>)</li>
+<li>Adversary chooses an integer <span class="math inline">\(k\)</span> (knowing <span class="math inline">\(n\)</span>)</li>
+<li>I win if <span class="math inline">\(n &gt; k\)</span>, adversary wins if not <span class="math inline">\(n &gt; k\)</span>,</li>
+</ol>
+<p>which under correct play the adversary can always win. (To wit, the
+formula is false). I will not bore you with the argument that this
+embedding is exact (it proceeds by induction on the number of
+quantifiers in the formula).</p>
+<h3 id="the-random-player"><em>The</em> Random Player</h3>
+<p>So far, so good. What does this have to do with probability, you ask?
+Well, game theorists have noticed that it can be useful to allow a
+different kind of player in their games—one that behaves randomly
+instead of trying to optimize some payoff like the other players. This
+random player is often called Nature (exercise for the reader: why
+does game theory never need more than one random player?) and the
+probability distribution(s) governing Nature’s behavior are taken to
+be part of the definition of the game (just like the legal move sets and
+objective functions governing the behavior of the normal players).</p>
+<p>For instance, the card game
+Bridge fits into this framework: at the beginning, Nature makes a move
+dealing the cards (which is traditionally taken to be a uniformly
+random choice among all possible deals), then each of the four players
+observes a portion of the deal (to wit, their own hand), and they
+start making moves according to the (now deterministic) rules of
+Bridge. After the bidding, three of the players observe some more of
+the deal (the dummy’s hand), and then continue making strategic moves.</p>
+<h3 id="back-to-logic">Back <em>to</em> Logic</h3>
+<p>We can bring the Nature player back to logic. I
+propose using the symbol <span class="math inline">\(\st\)</span> (a backwards letter ‘S’, for Stochastic) as a quantifier for randomly
+chosen variables.<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a> Just like you have to say what set an <span class="math inline">\(\exists\)</span> or
+a <span class="math inline">\(\forall\)</span> are drawn from, you have to say what probability
+distribution an <span class="math inline">\(\st\)</span> is drawn from. The usual quantifier order and
+scope rules apply.</p>
+<p>As to semantics, let us say that a
+(probabilistic) formula is “true with probability <span class="math inline">\(\geq p\)</span>” if I win
+the corresponding two-and-a-half player zero-sum game (the random
+player is counted as half) with probability <span class="math inline">\(\geq p\)</span> under optimal
+play.</p>
+<p>For example, calling a flip of a fair coin looks like
+<span class="math display">\[  \exists k \in \{\textrm{H},\textrm{T}\}. \st x \sim \textrm{uniform}\{\textrm{H},\textrm{T}\}. x = k, \]</span>
+which is the game</p>
+<ol type="1">
+<li>I choose <span class="math inline">\(\textrm{H}\)</span> or <span class="math inline">\(\textrm{T}\)</span></li>
+<li>Nature flips a (fair) coin</li>
+<li>I win if I chose what Nature flipped.</li>
+</ol>
+<p>This formula can reasonably be taken as “true with probability 50%”.</p>
+<p>In the case of fair coins, it doesn’t matter who calls it. The formula
+<span class="math display">\[  \forall k \in \{\textrm{H},\textrm{T}\}. \st x \sim \textrm{uniform}\{\textrm{H},\textrm{T}\}. x = k, \]</span>
+which is the game</p>
+<ol type="1">
+<li>The adversary chooses <span class="math inline">\(\textrm{H}\)</span> or <span class="math inline">\(\textrm{T}\)</span></li>
+<li>Nature flips a (fair) coin</li>
+<li>I win if the adversary chose what Nature flipped,</li>
+</ol>
+<p>is also “true with probability 50%”.</p>
+<p>Observe that each of these is a very different game from the ones where the
+chooser gets to see the result of Nature’s flip before making their
+choice:
+<span class="math display">\[  \st x \sim \textrm{uniform}\{\textrm{H},\textrm{T}\}. \exists k \in \{\textrm{H},\textrm{T}\}. x = k \]</span>
+is the game</p>
+<ol type="1">
+<li>Nature flips a coin</li>
+<li>I choose <span class="math inline">\(\textrm{H}\)</span> or <span class="math inline">\(\textrm{T}\)</span> (knowing the result)</li>
+<li>I win if I chose what Nature flipped.</li>
+</ol>
+<p>I can always win this game, so this formula is true (with probability 100%).</p>
+<p>Conversely,
+<span class="math display">\[  \st x \sim \textrm{uniform}\{\textrm{H},\textrm{T}\}. \forall k \in \{\textrm{H},\textrm{T}\}. x = k \]</span>
+is the game</p>
+<ol type="1">
+<li>Nature flips a coin</li>
+<li>The adversary chooses <span class="math inline">\(\textrm{H}\)</span> or <span class="math inline">\(\textrm{T}\)</span> (knowing the result)</li>
+<li>I win if the adversary chose what Nature flipped.</li>
+</ol>
+<p>The adversary can always make me lose this game, so this formula is
+false (i.e., true with probability 0%).</p>
+<p>I hope this example has convinced you that when probability occurs in logic, one
+must take the same care about scoping quantifiers as one does when
+mixing <span class="math inline">\(\exists\)</span> with <span class="math inline">\(\forall\)</span>.</p>
+<h3 id="summary">Summary</h3>
+<ul>
+<li><span class="math inline">\(\forall x \in X\)</span> means the adversary chooses <span class="math inline">\(x\)</span> from the set <span class="math inline">\(X\)</span>.</li>
+<li><span class="math inline">\(\exists x \in X\)</span> means I choose <span class="math inline">\(x\)</span> from the set <span class="math inline">\(X\)</span>.</li>
+<li><span class="math inline">\(\st x \sim P\)</span> means an impartial player chooses <span class="math inline">\(x\)</span> according to the
+probability distribution <span class="math inline">\(P\)</span>.</li>
+</ul>
+<h2 id="statistics">Statistics</h2>
+<p>Now what does this have to do with Bayesian and frequentist
+statistics? Bayesian statistics always reasons about probability distributions,
+but frequentist statistics makes definitions with foralls in them. In other
+words, Bayesians play solitaire against Nature, whereas frequentists
+take on strategic adversaries. This means that frequentism is both
+harder and more pessimistic than Bayesianism.<a href="#fn4" class="footnote-ref" id="fnref4" role="doc-noteref"><sup>4</sup></a></p>
+<p>I will illustrate by comparing <a href="https://en.wikipedia.org/wiki/Confidence_interval">confidence
+intervals</a> and
+<a href="https://en.wikipedia.org/wiki/Credible_interval">credible intervals</a>,
+the textbook frequentist and Bayesian, respectively, approaches to the
+<a href="https://en.wikipedia.org/wiki/Interval_estimation">interval
+estimation</a> problem.
+Interval estimates are the sort of statistics one sees in the news:
+there is some number of interest, such as the proportion of voters
+that lean towards one or another political party in an upcoming
+election; some evidence about this number is gathered, such as polling
+a random fraction of those voters; some computation is done; and an
+interval is announced, that is purported to contain the number of
+interest with some degree of confidence. As we shall soon see, the
+frequentist and Bayesian notions of “confidence” are actually quite
+different; but that is the basic set up.</p>
+<h3 id="frequentist">Frequentist</h3>
+<p>The standard frequentist tool for inverval estimation is the
+confidence interval. More generally, one can define confidence regions
+for set estimation of parameters that have other structure than single
+numbers. To give the construction, we start with a little notation:</p>
+<ul>
+<li>Suppose the item we are interested in is drawn from a <em>parameter
+space</em> <span class="math inline">\(A\)</span>.</li>
+</ul>
+<p>In a simple rendition of the political example, this would be <span class="math inline">\([0,1]\)</span>,
+representing all possible fractions of voters preferring one
+particular party over the other.</p>
+<ul>
+<li>Suppose the experiment we conduct produces results in some
+<em>observation space</em> <span class="math inline">\(B\)</span>.</li>
+</ul>
+<p>In the example, the experiment could be a poll, and <span class="math inline">\(B\)</span> could be the
+space of possible results.</p>
+<ul>
+<li>We model the influence the parameter exerts on the observations as a
+function from <span class="math inline">\(A\)</span> to <span class="math inline">\(B\)</span>, which we take to be random because we
+assume the observations are also affected by other influences. This
+function is traditionally called the <em>likelihood</em><a href="#fn5" class="footnote-ref" id="fnref5" role="doc-noteref"><sup>5</sup></a>, and
+can also be seen as a deterministic function from <span class="math inline">\(A\)</span> to probability
+distributions over <span class="math inline">\(B\)</span>:
+<span class="math display">\[\textrm{likelihood}: A \to \Pr(B).\]</span></li>
+</ul>
+<p>In the polling example, the randomness of the <span class="math inline">\(\textrm{likelihood}\)</span>
+would include, for instance, our choice of whom to poll.</p>
+<p>The definition of the likelihood function is the place where our
+qualitative modeling assumptions turn into analyzable objects that we
+can do mathematics with. Now,</p>
+<ul>
+<li>a <em>95% confidence interval</em> is a (deterministic) procedure for
+going from an observation to a set of possible parameters
+<span class="math display">\[\textrm{conf_int}: B \to \mathcal P(A)\]</span>
+such that
+<span class="math display">\[ \forall a \in A. \st b \sim \textrm{likelihood}(a). a \in \textrm{conf_int}(b) \]</span> with probability <span class="math inline">\(\geq\)</span> 95%,
+where the probability is taken over the randomness of the
+likelihood.</li>
+</ul>
+<p>In words, this formula means that for any <span class="math inline">\(a \in A\)</span> (chosen to be as
+difficult as possible), at least 95% of the <span class="math inline">\(b\)</span> drawn according to
+<span class="math inline">\(\textrm{likelihood}(a)\)</span> are such that the original <span class="math inline">\(a\)</span> is inside the
+confidence interval computed from the given <span class="math inline">\(b\)</span>. In the political
+example, this translates to the following requirement on the
+confidence interval procedure: whatever the true leanings of the
+population may be, at least 95% of possible polls conducted according
+to our design must lead, via our <span class="math inline">\(\textrm{conf_int}\)</span>, to intervals that
+contain those true leanings.</p>
+<p>The thing to remember is that <span class="math inline">\(\textrm{conf_int}\)</span> does not depend on <span class="math inline">\(a\)</span>. As a
+game, finding confidence intervals for a given problem looks like</p>
+<ol type="1">
+<li>I choose a function <span class="math inline">\(\textrm{conf_int}: B \to \mathcal P(A)\)</span></li>
+<li>The adversary chooses an <span class="math inline">\(a\)</span> (knowing <span class="math inline">\(\textrm{conf_int}\)</span>)</li>
+<li>Nature chooses a <span class="math inline">\(b\)</span>, given the adversary’s <span class="math inline">\(a\)</span>, according to the <span class="math inline">\(\textrm{likelihood}\)</span></li>
+<li>I win if <span class="math inline">\(a \in \textrm{conf_int}(b)\)</span>.</li>
+</ol>
+<p>The design task when choosing <span class="math inline">\(\textrm{conf_int}\)</span> is usually to
+minimize the cardinality of the sets that it returns, subject to the
+above game being won with probability at least 95%.</p>
+<h3 id="bayesian">Bayesian</h3>
+<p>The standard Bayesian tool for inverval estimation is the credible
+interval. In general, a <em>95% credible interval</em> for some probability
+distribution <span class="math inline">\(\pi\)</span> on some set <span class="math inline">\(A\)</span> is a
+set of <span class="math inline">\(S \subset A\)</span> such that
+<span class="math inline">\(\st a \sim \pi. a \in S\)</span>
+with probability <span class="math inline">\(\geq\)</span> 95%,
+where the probability is taken over the given distribution. The design
+task is usually to minimize the cardinality of the set.</p>
+<p>This applies to the interval estimation setting as follows:</p>
+<ul>
+<li>Start with a parameter space <span class="math inline">\(A\)</span>, an observation space <span class="math inline">\(B\)</span>,
+and a <span class="math inline">\(\textrm{likelihood}: A \to \Pr(B)\)</span> as before.</li>
+</ul>
+<p>In fact, the choice of <span class="math inline">\(\textrm{likelihood}\)</span> function for any given
+problem is often common between frequent and Bayesian analyses.</p>
+<ul>
+<li>We model our existing, pre-experiment knowledge about our problem as
+a probability distribution <span class="math inline">\(\pi\)</span> on <span class="math inline">\(A\)</span>, which is called the
+<em>prior</em>.</li>
+</ul>
+<p>In the political example, the prior might be the uniform distribution
+on the interval <span class="math inline">\([0,1]\)</span> if we modeled the problem assuming relatively
+little knowledge about politics; or it might be a Gaussian
+distribution with mean 50% and standard deviation 1 percentage point,
+if we modeled the problem assuming pretty strong external evidence
+that the election was going to be close. Choice of prior is
+important—different priors mathematically encode different problems,
+so yield different answers.</p>
+<ul>
+<li>Given a prior and a likelihood, <a href="https://en.wikipedia.org/wiki/Bayes%27_theorem">Bayes’ rule</a>
+gives the procedure for finding <em>posteriors</em> conditioned on possible observations
+<span class="math inline">\(b \in B\)</span>, which are also probability distributions on <span class="math inline">\(A\)</span>.
+The application of Bayes’ rule can be viewed as a function,
+<span class="math display">\[\textrm{posterior}: B \to \Pr(A),\]</span>
+which updates our prior distribution to reflect learning the information <span class="math inline">\(b\)</span>.</li>
+</ul>
+<p>In the political example, the posterior distribution describes the
+state of our knowledge about the coming election after digesting the poll
+results. It’s called the posterior (as opposed to the prior) because
+it is the distribution post-experiment.</p>
+<ul>
+<li>To get an interval estimation procedure, we can compose computing
+posteriors with choosing 95% credible intervals to get
+<span class="math display">\[\textrm{cred_int}: B \to \mathcal P(A).\]</span>
+This <span class="math inline">\(\textrm{cred_int}\)</span> then has the property that
+<span class="math display">\[\st a \sim \pi. \st b \sim \textrm{likelihood}(a). a \in \textrm{cred_int}(b)\]</span>
+with probability <span class="math inline">\(\geq\)</span> 95%, where the probability is taken over
+<em>the prior and the likelihood</em>.</li>
+</ul>
+<p>In words, this formula means that at least 95% of the time, when <span class="math inline">\(a\)</span>
+is drawn according to <span class="math inline">\(\pi\)</span> and <span class="math inline">\(b\)</span> is drawn according to
+<span class="math inline">\(\textrm{likelihood}(a)\)</span>, it turns out that <span class="math inline">\(a\)</span> is inside the credible
+interval computed from <span class="math inline">\(b\)</span>. The translation to the political example
+is direct: in 95% of leaning-poll pairs, where the population leanings
+are drawn according to the prior and the poll results are drawn
+according to the likelihood, the credible interval computed from the
+poll result will contain the true leaning of the population.</p>
+<p>One way to render selection of credible intervals as a game is</p>
+<ol type="1">
+<li>I choose a function <span class="math inline">\(\textrm{cred_int}: B \to \mathcal P(A)\)</span></li>
+<li>Nature chooses <span class="math inline">\(a\)</span> according to the prior</li>
+<li>Nature chooses <span class="math inline">\(b\)</span> given <span class="math inline">\(a\)</span> according to the likelihood</li>
+<li>I win if <span class="math inline">\(a \in \textrm{cred_int}(b)\)</span>.</li>
+</ol>
+<p>The design task when choosing <span class="math inline">\(\textrm{cred_int}\)</span> is usually to
+minimize the cardinality of the sets that it returns, subject to the above
+game being won with probability at least 95%.</p>
+<h3 id="comparison">Comparison</h3>
+<p>Look at these formulae side by side. A 95% confidence
+interval for a given parameter space <span class="math inline">\(A\)</span> and a given <span class="math inline">\(\textrm{likelihood}: A \to \Pr(B)\)</span>
+is a function from <span class="math inline">\(B\)</span> to <span class="math inline">\(\mathcal P(A)\)</span> such that
+<span class="math display">\[ \forall a \in A. \st b \sim \textrm{likelihood}(a). a \in \textrm{conf_int}_{A,\textrm{likelihood}}(b) \]</span>
+with probability <span class="math inline">\(\geq\)</span> 95%.</p>
+<p>A 95% credibility interval for a given prior <span class="math inline">\(\pi\)</span> over
+<span class="math inline">\(A\)</span> and a given <span class="math inline">\(\textrm{likelihood}: A \to \Pr(B)\)</span> is a function from <span class="math inline">\(B\)</span> to <span class="math inline">\(\mathcal P(A)\)</span> such that
+<span class="math display">\[\st a \sim \pi. \st b \sim \textrm{likelihood}(a). a \in \textrm{cred_int}_{\pi,\textrm{likelihood}}(b)\]</span>
+with probability <span class="math inline">\(\geq\)</span> 95%.</p>
+<p>The difference between these two formulations is that the frequentist formula
+has a <span class="math inline">\(\forall a \in A\)</span> where the Bayesian one has a <span class="math inline">\(\st a \sim \pi\)</span>. In other words, where
+the frequentist analysis assumes an adversary, the Bayesian one postulates a fixed
+(probabilistic) behavior. This has several consequences:</p>
+<ul>
+<li><p>Frequentist statistics answer a different kind of question from
+Bayesian ones.</p></li>
+<li><p>The frequentist question should be <em>askable</em> in situations where the
+Bayesian one is not, namely where the information available about possible <span class="math inline">\(a\)</span>s
+cannot be captured as a probability distribution.<a href="#fn6" class="footnote-ref" id="fnref6" role="doc-noteref"><sup>6</sup></a></p></li>
+<li><p>The Bayesian question should be <em>answerable</em> in situations where the
+frequentist one is not, because having more than one kind of
+quantifier always causes trouble. Here I mean mathematically
+answerable; empirically there are circumstances where a forall is
+computationally more tractable than a probability distribution.</p></li>
+<li><p>When a situation is modelable in both styles, one would expect the
+answer to the Bayesian style of question to be more optimistic than
+the frequentist, because the adversary is assumed to always choose
+the worst possible <span class="math inline">\(a\)</span>. Sometimes, when the prior encodes more
+information than we are actually justified in assuming, optimism can
+lead to incorrect conclusions. Other times, when “all” possibilities
+admit arbitrarily extraordinary coincidences, pessimism can lead to
+conclusions so weak as to be paralyzing.</p></li>
+<li><p>What question, exactly, “the frequentist question” actually is
+depends very strongly on the details of the game design: where the
+foralls/adversaries actually go, and in what order the choices are
+made. For example, it is important that the confidence interval function is
+to be chosen before the adversary chooses the <span class="math inline">\(a\)</span> at which to test
+it.</p>
+<p>In practice, the choice of how to encode a given complex
+statistical situation as a frequentist adversarial game can be
+just as contentious as the choice of prior in a Bayesian analysis.</p></li>
+</ul>
+<h2 id="reflection">Reflection</h2>
+<p>A quantifier indicates the “quantity” of things
+about which something is true. In this sense, all three of the symbols
+that appear in this essay are quantifiers—<span class="math inline">\(\exists\)</span> is “at least one”,
+<span class="math inline">\(\forall\)</span> is “all”, and <span class="math inline">\(\st\)</span> is “several”. The
+game theoretic view, however, exposes a distinction
+between <span class="math inline">\(\exists\)</span> and <span class="math inline">\(\forall\)</span> as opposed to <span class="math inline">\(\st\)</span>. The former two
+are optimization quantifiers: they define the value they bind by
+specifying a set of possibilities and an objective function, and
+assuming the optimal value for that objective is somehow found.
+<span class="math inline">\(\exists\)</span> and <span class="math inline">\(\forall\)</span> differ only in the objective (to make the
+subsequent formula true or false, respectively), so even in the game
+theoretic sense they are very similar creatures.</p>
+<p>The random choice quantifier <span class="math inline">\(\st x \sim P\)</span> is different. The
+<span class="math inline">\(x\)</span> is not an extremum of anything; it is chosen at random. And yet
+<span class="math inline">\(\st\)</span> is also the same as the classical quantifiers, in that
+it also hides the details of how <span class="math inline">\(x\)</span> is chosen—this time behind the
+probability distribution <span class="math inline">\(P\)</span> (which could be very complicated, and
+very difficult to actually select a value from computationally).<a href="#fn7" class="footnote-ref" id="fnref7" role="doc-noteref"><sup>7</sup></a></p>
+<p>I wonder, then, what other
+complex processes would it be worth making symbols for? One
+thought is that <span class="math inline">\(\exists\)</span> takes on a slightly different meaning in
+intuitionistic rather than classical logic. I’m a bit fuzzy on the
+details, but I guess it corresponds to computable optimization (rather
+than the absolute optimization of classical <span class="math inline">\(\exists\)</span>). Does it make
+sense to ask for computationally limited optimization? Something like
+a game where the player is permitted only a polynomial amount of
+computation after seeing the last move before having to make theirs?</p>
+<h2 id="notes">Notes</h2>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script type="text/javascript">
+MathJax.Hub.Config({
+  TeX: {
+    Macros: {
+      R: "{\\mathbb{R}}",
+      Z: "{\\mathbb{Z}}",
+      eps: "\\varepsilon",
+      st: "\\unicode{423}",
+      sim: "\\propto"
+    },
+    equationNumbers: { autoNumber: "AMS" },
+    noErrors: { disabled: true },
+  }
+});
+</script>
+<section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p>The embedding can be generalized to formulae that are not in
+prenex normal form. Just treat each quantifier as a move by a
+player whose goal is to make the expression in that quantifier’s scope
+come out true (for <span class="math inline">\(\exists\)</span>) or false (for <span class="math inline">\(\forall\)</span>). The truth is
+dependent upon the values already chosen by all quantifiers in scope
+at that point (which values the player knows). I will, however, stick
+with prenex formulae in the main text, because they are
+easier to think about.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>When we say “order of choices”, what we are actually talking about
+is the information available to a decision maker about the results of
+other decisions in the game. Chronology is a potent metaphor for
+capturing one pattern of information flow, namely complete knowledge
+about choices made “in the past” and complete absence of knowledge
+about choices that remain to be made “in the future”.
+Non-chronological information structures are possible, however. For
+example, in a three-player game, A might make some move, then B might
+make some move knowing what A did, but then C might have to move
+knowing what B did but not knowing what A did (except to the extent
+that it can be inferred from B’s activities).</p>
+<p>Logic generally does not try to encode such patterns, perhaps
+because they tend to make the games even more difficult to solve. One
+pattern has been recognized by some authors, however: a “branch
+quantifier” is when the adversary and I are to make “simultaneous”
+choices, each not knowing what the other has chosen.<a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3"><p>Colophon: The glyph <span class="math inline">\(\st\)</span> is the capital <a href="https://en.wikipedia.org/wiki/%C6%A7">reversed
+S</a>. That letter is called <code>LATIN CAPITAL LETTER TONE TWO</code> in
+Unicode (code point 423), and has <code>&amp;#423;</code> for a numeric HTML entity reference.<a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn4"><p>The reason for the name “frequentist” is that this is the
+kind of statistics one is forced into if one subscribes to the
+frequentist justification for probability theory. In a nutshell, the
+frequentist philosophical view is that probability theory legitimately
+describes only situations that correspond in a reasonable way to
+repeatable experiments with variable outcomes, where the probabilities
+are the frequencies (hence the name) of observed results. Probability
+therefore cannot, on this view, be applied to unique situations such
+as the true value of some parameter of interest. Given that the
+parameter is nonetheless unknown, one resorts to reasoning about what
+one can say for all possible values of the parameter.</p>
+<p>Bayesian statistics, in contrast, relies on the more permissive
+view (now associated with the 18th-century philosopher
+Thomas Bayes, hence the name) that probability theory is an extension
+of logic to propositions whose truth is not known with certainty.
+Under this view, there is nothing wrong with treating things like
+fixed but unknown parameters probabilistically, so no foralls are
+necessary.<a href="#fnref4" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn5"><p>This function is actually a probability distribution
+over <span class="math inline">\(B\)</span> conditioned on a value from <span class="math inline">\(A\)</span>. The reason it’s called a
+“likelihood” and not a “probability” is because in this use case we
+are interested in its behavior over the space <span class="math inline">\(A\)</span>, with a value in <span class="math inline">\(B\)</span>
+held fixed. Holding <span class="math inline">\(b\)</span> fixed, it measures how
+good—“likely”—various <span class="math inline">\(a\)</span> look, but it does not give a probability
+distribution over <span class="math inline">\(A\)</span>.<a href="#fnref5" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn6"><p>I stress that this situation is rarer than one might
+think, because many collections of information are capturable as
+probability distributions, without requiring appeal to repeated
+experiments with known mechanisms. In particular, the Bayesian
+statistics community has derived priors for many problems with the goal
+to “let the data speak of themselves”—to wit, encode no additional
+information at all, beyond the modeling assumptions encoded in the
+<span class="math inline">\(\textrm{likelihood}\)</span> function. I encourage the reader to look up
+“uninformative priors” or “reference priors”.<a href="#fnref6" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn7"><p>Perhaps it should not be surprising that students get
+confused by frequentist statistics. That field treads the relatively
+unexplored ground of mixing different kinds of quantifiers in a single
+theory. Besides game theory, it is the only theory I know about that
+does so; and since both of them are pretty new, perhaps we haven’t
+worked out good ways to think about such mixtures, or to teach people
+to think about such mixtures.<a href="#fnref7" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+  </div>
+
+  <footer>
+    <div class="metadata">
+    </div>
+    <div class="nav-back">
+      <a href="../../../" title>← Conversations index</a>
+    </div>
+  </footer>
+</article>
+
+      </div><!-- #content -->
+    </div><!-- #container -->
+
+    <div id="footer">
+    </div><!-- #footer -->
+  </div><!-- #wrapper .hfeed -->
+</body>
+</html>

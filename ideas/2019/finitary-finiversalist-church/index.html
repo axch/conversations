@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href="https://fonts.googleapis.com/css?family=Merriweather+Sans:800,400italic|Inconsolata:400|Merriweather:400,400italic" rel="stylesheet" type="text/css">
+
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta content="width=device-width" name="viewport">
+  <title>The Finitary Finiversalist Church</title>
+
+  
+  <meta name="author" content="Alexey Radul" />
+  
+
+  <link rel="stylesheet" type="text/css" href="../../../css/erudite.css" />
+  <link rel="icon" href="../../../favicon.ico" />
+  <link rel="alternate" type="application/rss+xml" title="Conversations Updates -- RSS" href="../../../feed.xml" />
+  
+</head>
+
+<body>
+
+  <div id="wrapper" class="hfeed">
+    <div id="header-wrap">
+      <div id="header" role="banner">
+        <h1 id="blog-title"><span><a href="../../../" title rel="home">Conversations</a></span></h1>
+        <div id="blog-description"></div>
+      </div><!--  #header -->
+      <div id="access" role="navigation">
+        <div class="skip-link"><a href="#content" title></a></div>
+      </div><!-- #access -->
+    </div><!--  #header-wrap -->
+
+    <div id="container">
+      <div id="content" role="main">
+        <article class="hentry" itemscope itemtype="http://schema.org/BlogPosting">
+  
+    <blockquote class="epigraph"><p>The study of mental objects with reproducible properties is called mathematics.<cite>&ndash;Davis and Hersh, 1981</cite>
+    </p></blockquote>
+  
+  <header>
+    <h2 class="entry-title" itemprop="name">The Finitary Finiversalist Church</h2>
+  </header>
+
+  <div class="entry-meta">
+
+    <span class="entry-date">
+      <abbr class="published">January 26, 2019</abbr>
+    </span>
+    <span class="author vcard">
+      By Alexey Radul
+    </span>
+  </div>
+
+  <div class="entry-content" itemprop="articleBody">
+    <p>Infinity. What is it, really? Perhaps you remember, as I do, the
+moment in your life when you realized one could (in principle) count
+forever, and there would always be integers there for one to count.
+Yet, how can our finite minds comprehend the truly infinite? Do
+infinte things even exist?</p>
+<p>My own thoughts on this subject have gone full circle. I accepted
+the infinitude of the integers at a young enough age. Since I recall this
+as an act of acceptance, I infer that I must previously have assumed
+that only finite things exist. But accept I did, and proceeded,
+over the course of my mathematical education, to grow more and more
+steeped in the mysteries of the non-finite. One can measure
+infinities by bijection; so the even numbers are no more and no less
+infinite than all the integers, and than the positive numbers
+divisible by 1000. Yet the real numbers are more infinite—they are
+too many to be counted, for there is no 1-1 mapping between them and
+the counting numbers.</p>
+<p>It went on from there: One can measure infinities more finely by
+order-preserving bijection. This leads to the
+<a href="https://en.wikipedia.org/wiki/Ordinal_number">ordinals</a>, to
+<a href="https://en.wikipedia.org/wiki/Transfinite_induction">transfinite induction</a>,
+to the <a href="https://en.wikipedia.org/wiki/Continuum_hypothesis">continuum hypothesis</a>.
+The <a href="https://en.wikipedia.org/wiki/Axiom_of_choice">axiom of choice</a>
+rears its controversial head. I was in my
+element, an initiate of eldritch powers delving (or, at least,
+learning how to delve) into eternal secrets beyond the (finite)
+universe. I accepted the Axiom for the power it gave, and looked down
+upon the doubters and detractors as only a teenager can.</p>
+<p>But the study of computing sowed the seeds of doubt, and the practice
+of probability germinated them, and with the passage of years they
+have begun to sprout. Real numbers are awkward things to try to
+compute with. It may be a little trite to say that you can’t store
+all of the digits of a real number in the memory of the computer, but
+the limits on precision really are a consistent source of trouble in
+practice.</p>
+<p>Probabilities over real numbers are awkward too. It’s easy enough to
+say “consider a real number drawn uniformly between 0 and 1”, but you
+can’t actually draw one: the probability of any given <span class="math inline">\(x\)</span> under that
+distribution is 0 (whether <span class="math inline">\(x\)</span> is between 0 and 1 or not!).
+Mathematically, one is forced to resort to the usual song and dance
+about probability densities: the limit as <span class="math inline">\(\eps\)</span> goes to zero of the
+ratio of the probability in the interval to the size of the interval,
+yada, yada. Computationally, finite precision makes this even worse:
+the joke in probabilistic computing is that probability zero events
+happen alarmingly often. To say nothing of trying represent those
+probability densities, and of periodically being bitten by having
+forgotten whether one was referencing
+<a href="https://en.wikipedia.org/wiki/Lebesgue_measure">Lebesgue</a> or
+<a href="https://en.wikipedia.org/wiki/Counting_measure">counting</a>
+measure.</p>
+<p>So what is it like to sit in the shade of the tree of doubt? The
+epigraph from which I started this essay is the foliage between me and
+the burning sun of irresolution. If mathematics is to be a study of
+mental objects, one cannot simply ban infinities, because infinite
+mental objects are too easy to construct (they even form a <a href="https://en.wikipedia.org/wiki/Lazy_evaluation#Working_with_infinite_data_structures">useful
+programming
+technique</a>).
+But they must have <em>reproducible</em> properties: so the place to draw the
+line is at objects that take an infinite amount of information to
+describe. This is the article of faith that defines finitary
+finiversalism: infinity only as the consequence of a finite description.</p>
+<p>What, then, is admissible? The integers may be infinite, but they are
+probably the most reproducible mental object in all of
+mathematics—every kid learns the integers. The rationals are fine
+too, as each is given as a ratio of two finite integers—nothing
+non-reproducible about that. What of the reals? They are
+conventionally defined as the completion (in the order topology) of
+the rationals. That is, a real number is the limit of a sequence of
+rational numbers. How are we to reproduce such a sequence? We can’t
+just write it all down, because the whole point is that the sequences
+with irrational limits are infinite. But we can of course specify
+some sequences. For instance, “the <span class="math inline">\(k\)</span>th term is the perimeter of a
+regular <span class="math inline">\(2^k\)</span>-gon of diameter two.” The limit is a perfectly good
+irrational number, with very many very well-reproduced properties.</p>
+<p>Which sequences of rationals are describable with a finite amount of
+information? Well, certainly any given Turing machine is fine: it can
+be encoded as a finite string in a finite alphabet. The only thing
+infinite about (some) Turing machines is their behavior; and the
+behavior can be reproduced by reproducing the machine.<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> So any
+sequence of rationals that we can program a (finite) computer to print
+is reproducible, at least in principle. And the
+<a href="https://en.wikipedia.org/wiki/Church-Turing_thesis">Church-Turing thesis</a>
+tells us that’s it.</p>
+<p>In fact, the Church-Turing thesis tells us that’s it for all of
+mathmatics, not just the reals. Computable objects are the <em>only</em>
+objects that can be described with a finite amount of information.
+This view reassuringly eliminates various controversies in
+mathematical foundations:</p>
+<ul>
+<li><p>Among sets of computable objects, the <a href="https://en.wikipedia.org/wiki/Well-ordering_theorem">well-ordering
+theorem</a>
+is obvious, because we can always order objects
+lexicographically by (the description of) the smallest Turing
+machines that compute them.<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a></p></li>
+<li><p>The conventionally controversial axiom of choice follows from
+well-ordering, but of necessity it’s now an axiom of
+finitely-specified choice.</p></li>
+<li><p>The conventional alternative to choice, namely the <a href="https://en.wikipedia.org/wiki/Axiom_of_determinacy">axiom of
+determinacy</a>,
+is moot. It concerns perfect play in
+(certain) infinite games, but since it’s not in general possible to
+compute the outcome of such a game even with a given pair of
+strategies, dicusssing existence of perfect strategies seems
+excessive.</p></li>
+</ul>
+<p>What of the real numbers? There are only countably many Turing
+machines, so the reals can’t really exist in a universe of only
+computable objects.<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a> What we have instead are the
+<a href="https://en.wikipedia.org/wiki/Computable_number">computable numbers</a>,
+which is the field of limits of
+computably-<a href="https://en.wikipedia.org/wiki/Cauchy_sequence">Cauchy</a>
+computable sequences of rationals. The famous <a href="https://en.wikipedia.org/wiki/Cantor%27s_diagonal_argument">Cantor diagonalization
+proof</a>
+that the classical reals are uncountable turns into a proof that there
+is no <em>computable</em> bijection between the computable numbers and the
+integers.</p>
+<p>On the other hand, the unique characterization of the reals still
+holds, and the computable numbers are indeed not complete. Not only
+is it not possible in general to compute the limit of a computable
+sequence of rationals, there are even specific <a href="https://en.wikipedia.org/wiki/Specker_sequence">computable sequences
+whose limits are not computable
+numbers</a>. (To get the
+limit one also needs to compute the Cauchy condition, i.e., bound how
+much farther the sequence may move.) Never mind that if one tries to
+make computable numbers totally ordered, one finds that equality is
+not computable.</p>
+<p>So the analysis one gets out of computable numbers is different from
+real analysis. Which analysis is better? Computable analysis is more
+faithful to reproducible reality: you really can’t reliably compute
+the limits of infinite sequences, and must instead ever watch for
+accumulating errors. On the other hand, real analysis is simpler:
+even formulating the computable analogue of any nontrivial statement
+requires thinking about what is to be computed, in what generality,
+and given what inputs. Real analysis is also better developed, having
+predated attempts at computable analysis by centuries.</p>
+<p>And so it is with infinity. It’s a simplification. Only behvaiors
+(of, e.g., computing processes) are infinite, but it’s often
+convenient to noun verbs and treat summaries of those behaviors as
+objects in their own right. But sometimes one needs information that
+was summarized away, and the predictive power of the summary fails.</p>
+<p>And that’s the finitary finiversalist catechism:</p>
+<ul>
+<li><p><em>What exists?</em> Only what can be communicated about.</p></li>
+<li><p><em>What can be communicated?</em> Only finite descriptions.</p></li>
+<li><p><em>What is infinite?</em> Only behaviors of finite machines.</p></li>
+<li><p><em>What are infinities?</em> Only summaries of infinite behavior.</p></li>
+<li><p><em>Do infinite or infinitesimal things exist?</em> Only while they
+summarize behavior faithfully.</p></li>
+</ul>
+<h2 id="notes">Notes</h2>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script type="text/javascript">
+MathJax.Hub.Config({
+  TeX: {
+    Macros: {
+      R: "{\\mathbb{R}}",
+      Pr: "{\\mathrm{Pr}}",
+      E: "\\mathbb{E}",
+      eps: "\\varepsilon"
+    }
+  }
+});
+</script>
+<section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p>And its input, and the model of computation in which it’s
+interpreted, but those are finite too.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>This ordering is not, in general,
+computable, because checking whether a given Turing machine is the
+smallest that emits a given (infinite) object is not computable. But
+while I don’t know offhand whether every computable set of computable
+objects can be computably well-ordered, this is a technical rather
+than philosophical question.<a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3"><p>One can, of course, study sets as formal entities in
+their own right—“the unique
+<a href="https://en.wikipedia.org/wiki/Least-upper-bound_property">Dedekind-complete</a>
+totally-ordered field extension of the rationals” is itself a mental
+object with reproducible properties, even if nearly all of the limit
+points it consists of are not. But how useful of a mental object is
+it?<a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+  </div>
+
+  <footer>
+    <div class="metadata">
+    </div>
+    <div class="nav-back">
+      <a href="../../../" title>← Conversations index</a>
+    </div>
+  </footer>
+</article>
+
+      </div><!-- #content -->
+    </div><!-- #container -->
+
+    <div id="footer">
+    </div><!-- #footer -->
+  </div><!-- #wrapper .hfeed -->
+</body>
+</html>

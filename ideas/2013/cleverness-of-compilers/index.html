@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href="https://fonts.googleapis.com/css?family=Merriweather+Sans:800,400italic|Inconsolata:400|Merriweather:400,400italic" rel="stylesheet" type="text/css">
+
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta content="width=device-width" name="viewport">
+  <title>On the Cleverness of Compilers</title>
+
+  
+  <meta name="author" content="Alexey Radul" />
+  
+
+  <link rel="stylesheet" type="text/css" href="../../../css/erudite.css" />
+  <link rel="icon" href="../../../favicon.ico" />
+  <link rel="alternate" type="application/rss+xml" title="Conversations Updates -- RSS" href="../../../feed.xml" />
+  
+</head>
+
+<body>
+
+  <div id="wrapper" class="hfeed">
+    <div id="header-wrap">
+      <div id="header" role="banner">
+        <h1 id="blog-title"><span><a href="../../../" title rel="home">Conversations</a></span></h1>
+        <div id="blog-description"></div>
+      </div><!--  #header -->
+      <div id="access" role="navigation">
+        <div class="skip-link"><a href="#content" title></a></div>
+      </div><!-- #access -->
+    </div><!--  #header-wrap -->
+
+    <div id="container">
+      <div id="content" role="main">
+        <article class="hentry" itemscope itemtype="http://schema.org/BlogPosting">
+  
+  <header>
+    <h2 class="entry-title" itemprop="name"><em>On the</em> Cleverness <em>of</em> Compilers</h2>
+  </header>
+
+  <div class="entry-meta">
+
+    <span class="entry-date">
+      <abbr class="published">August 22, 2013</abbr>
+    </span>
+    <span class="author vcard">
+      By Alexey Radul
+    </span>
+  </div>
+
+  <div class="entry-content" itemprop="articleBody">
+    <p>The “Sufficiently Clever Compiler” has become something of a trope in
+the Lisp community: the mythical beast that promises language and
+interface designers near-unlimited freedom, and leaves their output in
+a performance lurch by its non-appearance. A few years ago, I was
+young enough to join a research project to build one of these things.
+Neglecting a raft of asterisks, footnotes, and caveats, we ended up
+making something whose essence is pretty impressive: you pay for
+abstraction boundaries in compile-time resources, but they end up free
+at runtime. One
+<a href="https://github.com/axch/dysvunctional-language">prototype</a> was just
+open-sourced recently, so that makes now a good time to talk about it.</p>
+<p>Permit me to begin my musings on this subject with an example. The
+next element on this page is a Javascript Canvas object, whereon, upon
+your clicking the button labeled “Go!”, your browser will draw a
+progressively-refined rendition of the <a href="https://en.wikipedia.org/wiki/Mandelbrot_set">Mandelbrot
+set</a>, anti-aliased for
+your viewing pleasure. It will also display how long each iteration
+took to compute, both in real time and in count of floating point
+arithmetic operations.<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></p>
+<center>
+<canvas id="it" width="500" height="500">
+</canvas>
+<br />
+<button onclick="doit()">Go!</button><img id="spinner" src="spinner.gif"> <br />
+<table id="timings">
+<tr>
+<th>
+Resolution
+</th>
+<th>
+Mflops
+</th>
+<th>
+Time (ms)
+</th>
+</table>
+</center>
+<style>
+#it {border: 1px solid grey; margin: 0 auto;}
+#spinner {border: none; margin: 0px; vertical-align:middle; display: none;}
+</style>
+<script src="mandel.js" type="text/javascript"></script>
+<script src="mandel-driver.js" type="text/javascript"></script>
+<p>I obviously don’t know how fast this demo runs on your computer, but
+on mine, in Firefox 23.0, with <a href="http://asmjs.org/">asm.js</a> turned on,
+I get a little under 1 Mflop/ms. Given that my CPU is 1.6 GHz, that’s
+an average of a little over half a floating-point operation per clock
+cycle. Not bad for a single-threaded Javascript program, eh?<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a></p>
+<p>What do you think the inner loop of that program looks like? You
+could be forgiven for thinking that it looks something like this:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">fol_program</span>(stdlib<span class="op">,</span> foreign<span class="op">,</span> heap) {</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;use asm&quot;</span><span class="op">;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">var</span> heap_view <span class="op">=</span> <span class="kw">new</span> stdlib<span class="op">.</span><span class="fu">Float32Array</span>(heap)<span class="op">;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">var</span> sqrt <span class="op">=</span> stdlib<span class="op">.</span><span class="at">Math</span><span class="op">.</span><span class="at">sqrt</span><span class="op">;</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">function</span> <span class="fu">op_231</span>(count<span class="op">,</span> c_x<span class="op">,</span> c_y<span class="op">,</span> z_x<span class="op">,</span> z_y) {</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    count <span class="op">=</span> <span class="op">+</span>count<span class="op">;</span> c_x <span class="op">=</span> <span class="op">+</span>c_x<span class="op">;</span> c_y <span class="op">=</span> <span class="op">+</span>c_y<span class="op">;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    z_x <span class="op">=</span> <span class="op">+</span>z_x<span class="op">;</span> z_y <span class="op">=</span> <span class="op">+</span>z_y<span class="op">;</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (count <span class="op">&lt;=</span> <span class="fl">0.0</span>) {</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>      heap_view[<span class="dv">0</span>] <span class="op">=</span> z_x<span class="op">;</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>      heap_view[<span class="dv">1</span>] <span class="op">=</span> z_y<span class="op">;</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>      <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>    } <span class="cf">else</span> {</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>      <span class="fu">op_231</span>(count <span class="op">-</span> <span class="fl">1.0</span><span class="op">,</span> c_x<span class="op">,</span> c_y<span class="op">,</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>             ((z_x<span class="op">*</span>z_x <span class="op">-</span> z_y<span class="op">*</span>z_y) <span class="op">+</span> c_x)<span class="op">,</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>             ((z_x<span class="op">*</span>z_y <span class="op">+</span> z_y<span class="op">*</span>z_x) <span class="op">+</span> c_y))<span class="op">;</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>      <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>  <span class="kw">function</span> <span class="fu">__main__</span>(x<span class="op">,</span> y) {</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    x <span class="op">=</span> <span class="op">+</span>x<span class="op">;</span> y <span class="op">=</span> <span class="op">+</span>y<span class="op">;</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> z_x <span class="op">=</span> <span class="fl">0.0</span><span class="op">;</span> <span class="kw">var</span> z_y <span class="op">=</span> <span class="fl">0.0</span><span class="op">;</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>    <span class="fu">op_231</span>(<span class="fl">400.0</span><span class="op">,</span> x<span class="op">,</span> y<span class="op">,</span> <span class="fl">0.0</span><span class="op">,</span> <span class="fl">0.0</span>)<span class="op">;</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>    z_x <span class="op">=</span> <span class="op">+</span>heap_view[<span class="dv">0</span>]<span class="op">;</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>    z_y <span class="op">=</span> <span class="op">+</span>heap_view[<span class="dv">1</span>]<span class="op">;</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (<span class="op">+</span><span class="fu">sqrt</span>(z_x<span class="op">*</span>z_x <span class="op">+</span> z_y<span class="op">*</span>z_y) <span class="op">&lt;</span> <span class="fl">2.0</span>)<span class="op">|</span><span class="dv">0</span><span class="op">;</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> __main__<span class="op">;</span></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>If you thought that, you would not be entirely wrong, because that is,
+in fact, the Mandelbrot set membership test code that your browser
+actually executes around a million times when you click on the “Go!”
+button.</p>
+<p>However, the way I want to actually write that program looks like
+this:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode scheme"><code class="sourceCode scheme"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">;;; Complex arithmetic library</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>(c:+ z1 z2)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">cons</span> (<span class="op">+</span> (<span class="kw">car</span> z1) (<span class="kw">car</span> z2))</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>        (<span class="op">+</span> (<span class="kw">cdr</span> z1) (<span class="kw">cdr</span> z2))))</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>(c:* z1 z2)</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">cons</span> (<span class="op">-</span> (<span class="op">*</span> (<span class="kw">car</span> z1) (<span class="kw">car</span> z2))</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>           (<span class="op">*</span> (<span class="kw">cdr</span> z1) (<span class="kw">cdr</span> z2)))</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>        (<span class="op">+</span> (<span class="op">*</span> (<span class="kw">car</span> z1) (<span class="kw">cdr</span> z2))</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>           (<span class="op">*</span> (<span class="kw">cdr</span> z1) (<span class="kw">car</span> z2)))))</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> c:0 </span>(<span class="kw">cons</span> (real <span class="dv">0</span>) (real <span class="dv">0</span>)))</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>(<span class="kw">magnitude</span> z)</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">sqrt</span> (<span class="op">+</span> (<span class="op">*</span> (<span class="kw">car</span> z) (<span class="kw">car</span> z))</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>           (<span class="op">*</span> (<span class="kw">cdr</span> z) (<span class="kw">cdr</span> z)))))</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="co">;;; Iteration library</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>(iterate count f x)</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">if</span> (<span class="op">&lt;=</span> count <span class="dv">0</span>)</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>      x</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>      (iterate (<span class="op">-</span> count <span class="dv">1</span>) f (f x))))</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="co">;;; Mandelbrot set membership test</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>((step c) z)</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>  (c:+ (c:* z z) c))</span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>(mandelbrot? c)</span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>  (<span class="op">&lt;</span> (<span class="kw">magnitude</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>      (iterate (real <span class="dv">400</span>) (step c) c:0))</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>     <span class="dv">2</span>))</span></code></pre></div>
+<p>Doubtless the first difference that jumps out at you is that one of
+these programs is written using a beautiful, familiar surface syntax
+that makes you feel right at home, while the other uses an ugly,
+foreign notation that makes your eyes glaze over. That’s not the
+point, though.</p>
+<p>The important difference is that the program the browser runs (in
+Javascript) is much less modular than the program I want to write (in
+Scheme, as it happens). In the Javascript program, all the concepts
+relating to Mandelbrot set membership testing are mushed together: the
+concepts of complex arithmetic are mixed up with the concept of
+iterating a function, and mixed up with the definition of the function
+to iterate. None of them are available as named entities; if you
+wanted to solve the problem a different way, you would have to rewrite
+the entire thing from scratch.</p>
+<blockquote class="pullquote-display">
+<p>
+The very advantage of modularity is the
+source of its performance cost: modularity is the ability to do things
+other than what you did.
+</p>
+</blockquote>
+<p>In the Scheme program, however, they are separate definitions, given
+their own separate names. Complex arithmetic is defined in one place,
+independent of how you choose to use it. The step function defining
+the Mandelbrot recurrence is defined in another place, available to be
+used any which way you want. The idea of iterating a function for a
+while is defined in another place, independent of the function to
+iterate. A change of algorithm becomes a matter of rearranging the
+available pieces, rather than of rewriting the whole program.</p>
+<p>And there we have a clue as to why, in modern computing, modular code
+is not high-performance code. The very advantage of modularity is the
+source of its performance cost: modularity is the ability to do things
+other than what you did. Modularity is the ability to reuse the same
+idea in many different ways and in many different places.</p>
+<p>The cost that modularity carries is generic linkages between the
+“idea” and the “places”. That linkage carries its own cost at
+runtime, but more importantly, it impedes other optimizations. In our
+example, <code>iterate</code> accepts an arbitrary function <code>f</code>. That means the
+call <code>(f x)</code> in iterate has to be set up to call an arbitrary
+function. It also means that its argument and its return value have
+to be communicated using completely generic mechanisms.</p>
+<p>Symmetrically, the function produced by <code>(step c)</code>, being a
+first-class object in Scheme, can be used anywhere. That means it has
+to accept its argument and produce its return value using completely
+generic mechanisms, that match the generic call sites. It also means
+that we cannot optimize it by changing its interface, because we do
+not know the places where the complementary changes would need to be
+made. So <code>(step c)</code> must accept its complex number argument and
+return its complex number result each as a single value, presumably
+machine-word-sized; so those complex numbers have to be allocated and
+dereferenced; and the cost of making those data structures all the
+time dwarfs the cost of the arithmetic we are trying to do.</p>
+<p>“But wait!” I can hear you say to yourself, “I know what function
+<code>iterate</code> is iterating, and I know where <code>(step c)</code> is called. Why is
+my compiler so dumb as not to notice that <code>mandelbrot?</code> calls for an
+iteration of exactly <code>(step c)</code>, and produce code for it that takes
+this into account? Then it would be clear that the complex number
+produced by one call to <code>(step c)</code> will just be consumed by the next,
+and the program can avoid allocating a silly two-element structure for
+it by just passing the two parts in variables.” (Which is, of course,
+how the Javascript program behaves.)</p>
+<blockquote class="pullquote-display">
+<p>
+Specialization is the path from modularity to performance.
+</p>
+</blockquote>
+<p>That’s right. The thing you did there was a little bit of (combined
+data- and control-) flow analysis, computing that <code>iterate</code> gets
+called with <code>(step c)</code> as an argument and therefore <code>(step c)</code> appears
+as the <code>f</code> in the call <code>(f x)</code> inside <code>iterate</code>. You also decided
+that, at least for this problem, it is probably worthwhile to produce
+a version of <code>iterate</code> that is specialized to <code>(step c)</code> as an
+argument (with due provision for operating on different values of
+<code>c</code>). And that’s my point. I conjecture that, at this moment in
+history, the one remaining piece of compiler technology that human
+programmers instinctively expect before admitting that a compiler is
+Sufficiently Clever is the knack for automatically specializing the
+right program elements to the context of their use.</p>
+<p>Specialization is the path from modularity to performance.<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a> A modular
+component is one that can be used in different ways in different
+places. A specialized component is one that is tailored to the way
+and place it is used, taking advantage of local context to improve
+efficiency; often to the point that separation between component and
+context is completely obscured. To the extent that specialization can
+be automated, doing so would let us have our cake and eat it
+too—write high-performance programs in a modular way.</p>
+<p>The problem with specialization is that it comes with its own cost: if
+a component is used in many places, specializing it to each context
+requires copying it. Since the inside of a component is, of course, a
+set of places where other components are used, the number of contexts
+grows with each specialization, and, unchecked, this process can
+easily get out of hand. That’s why mainstream compilers are pretty
+conservative about it.</p>
+<p>That being said, there are problem domains where really aggressive
+specialization should work wonders. The activity called “scientific
+computing” comes to mind: the main item of interest in these programs
+is some complicated, CPU- and memory-intensive (as opposed to
+I/O-intensive) computation involving floating-point numbers. All the
+fine data structures, first-class functions, and abstractions with
+which one might wish to write such programs are just scaffolding whose
+sole purpose is to get the right floating-point numbers to meet the
+right arithmetic operations. So it is tempting to try and see whether
+one could write scientific computing programs in a nice, high-level,
+modular way, and have the compiler solve the scaffolding at compile
+time (by specialization followed by standard optimizations) and
+produce efficient numerical code.</p>
+<p>That was the theory behind that research project I alluded to in the
+introduction. Modern general-purpose compilers do not generally
+specialize aggressively enough to “solve the scaffolding” of any
+nontrivial program. In particular, <a href="https://en.wikipedia.org/wiki/Automatic_differentiation">automatic
+differentiation</a>
+is an especially impressive form of scaffolding, that would be
+very nice to be able to use, but that tends to trigger “this is too
+costly to specialize” heuristics. But perhaps there is a niche for
+tools that specialize too much for general-purpose use, but enough to
+make (at least some) numerical kernels go really fast despite being
+very modular.</p>
+<p>I wrote one of those. Under the supervisorship of <a href="http://www-bcl.cs.may.ie/~barak/">Professor
+Pearlmutter</a> and with much
+assistance from our collaborator <a href="https://engineering.purdue.edu/~qobi/">Professor
+Siskind</a>, the research group
+studied various issues with semantics and implementation of automatic
+differentiation (which are &lt;%= link_to ‘nontrivial’,
+‘/ideas/2013-08-15-introduction-to-automatic-differentiation.html’
+%&gt;), forays into compiler technology, etc. It so transpired that I
+ended up being the primary author of the <a href="https://github.com/axch/dysvunctional-language">DysVunctional
+Language</a> prototype,
+which specializes away modularity boundaries (including a user-space
+automatic differentiation library) until the cows come home.</p>
+<p>Now, I do not advocate seriously using DVL (yet), as it is unfinished
+(and not very actively worked on right now, for lack of funds). For one, it is
+meant for numerical kernels, but it does not have a sensible foreign
+interface. For another, it requires programmer
+annotations to indicate what not to specialize on (in the complete
+absence of which, its flow analysis will amount to running your
+program slowly at compile time, and the code generator will amount to
+writing an executable that just prints out the answer). It is also
+research-prototype quality software in general—for instance, a type
+error in the source program will give you a prompt debugging the
+compiler.</p>
+<p>I am, nevertheless, quite proud of DVL. I flatter myself that its
+source is not too terribly hard to read, so it can serve as an example
+for how to do that kind of thing in a different context. And the
+thing it does, if you get your program to compile, feels pretty
+magical: as much abstraction and modularity as you could want gets
+stripped away, revealing the bare numerical computation for the
+computer to just execute. Not just on podunk 30-line Mandelbrot set
+programs, either—check out the <a href="https://github.com/axch/dysvunctional-language/blob/master/dvl/examples/celestial/">celestial
+mechanics</a>
+example.</p>
+<p>Now, DVL is not Sufficiently Clever for general-purpose programming,
+because it doesn’t know what not to specialize. That’s an
+<a href="https://scholar.google.com/scholar?q=supercompilation">open</a>
+<a href="https://scholar.google.com/scholar?q=partial+evaluation">problem</a>, but
+it feels to me like the right place to dig.</p>
+<h2 id="notes">Notes</h2>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script type="text/javascript">
+MathJax.Hub.Config({
+  TeX: {
+    Macros: {
+      C: "{\\mathbb{C}}"
+    },
+    equationNumbers: { autoNumber: "AMS" },
+    noErrors: { disabled: true },
+  }
+});
+</script>
+<section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p>Here is how I count floating-point operations.
+The Mandelbrot set, by definition, is those complex numbers <span class="math inline">\(c\)</span> for which
+iterating
+<span class="math display">\[z_{n+1} = z_n^2 + c\]</span>
+from <span class="math inline">\(z_0 = 0\)</span> does not escape to infinity. It’s not too hard to
+check that, if <span class="math inline">\(|z_n|\)</span> ever exceeds 2, then that iteration will escape
+to infinity, regardless of <span class="math inline">\(c\)</span>. This suggests an algorithm for
+approximating membership in the Mandelbrot set: for any <span class="math inline">\(c\)</span> of interest,
+run the iteration for a fixed number of steps. If the result’s magnitude
+exceeds 2, <span class="math inline">\(c\)</span> is not in the Mandelbrot set; if it does not, we can
+approximately say that <span class="math inline">\(c\)</span> is in the set.</p>
+<p>The program in the demo follows this algorithm. Every iteration
+takes 10 arithmetic operations (six for the complex multiply, two for
+the complex add, and two for bookkeeping). I chose to go for 400
+iterations per point. Every pixel tests 4 points, for the
+anti-aliasing. That makes
+<span class="math display">\[ 4 \frac{\textrm{points}}{\textrm{pixel}}
+   \cdot 400 \frac{\textrm{iters}}{\textrm{point}}
+   \cdot 10 \frac{\textrm{flops}}{\textrm{iter}}
+   = 16,\!000 \frac{\textrm{flops}}{\textrm{pixel}}, \]</span>
+which is where the counts in the table come from.</p>
+<p>Aside: It is surely computationally more efficient to check
+intermediate steps in the iteration for escaping rather than always
+going a fixed number of steps, but that makes counting floating point
+operations harder, because you do not know how many get skipped.
+That’s why I chose not to do that for this exercise.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>As of this writing, the best program
+for computing the Mandelbrot set on the <a href="https://benchmarksgame.alioth.debian.org/u32/performance.php?test=mandelbrot">Computer Language Benchmarks
+Game</a>
+(which happened to be written in Fortran 90 and compiled with the Intel Fortran compiler)
+was only six times faster than the demo you see here. I do not know
+how much of that speedup was due to doing less actual
+computation—unlike this demo, that benchmark does truncate its
+iterations if they escape early, but the exact savings from this are
+hard to measure.<!--
+I didn't want to make a footnote to a footnote, so I include my
+calculation of that 6 times number in a comment:
+- The graphic in the benchmark is 16,000 x 16,000 pixels at 1 point
+  per pixel, whereas in the demo it's 500 x 500 pixels at 4 points per
+  pixel (for the antialiasing).
+- The benchmark iterates the Mandelbrot recursion 50 times, whereas
+  the demo does 400.
+- The program's best time is 14 seconds, whereas the demo gets 4.
+- The benchmark's test processor is 2.4 GHz, whereas mine is 1.6 GHz.
+- But, the benchmark permits stopping early is an intermediate point
+  is known to escape, and the best program also uses a trick to try
+  and save time on doing this test.
+If you multiply all that out, you get an advantage of 6x, which mixes in
+superiority of compilation (which is what we care about) with algorithmic
+improvements and differences in the suitability of the hardware for this
+task (e.g., I do not know how many floating point multipliers there are
+either in my chip or the processor the benchmark was run on).
+--><a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3"><p>One quip among compiler writers that expresses this
+sentiment is “inlining is the mother of all optimizations”. Inlining
+is the act of replacing a reference to some variable with that
+variable’s definition; putting the definition “in line”, as it were.
+This is particularly helpful if the variable in question refers to a
+function.</p>
+<p>Inlining can cause acceleration in its own right (for example, by
+eliminating the runtime cost of referring to the variable that was
+inlined), but the reason it is considered so important is because
+inlining a variable that is used in more than one place accomplishes
+specialization. Inlining a definition also constructs a proof that
+the specialized definition is used in exactly the one place where it
+is used, but bringing the definition to the use and deleting the
+reference is not the only way to do that. The idea of specialization
+is also applicable more widely than inlining, because it is possible
+(and desirable) to be able to specialize to clusters of similar
+contexts, without further specializing to each of these contexts
+individually.<a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+  </div>
+
+  <footer>
+    <div class="metadata">
+    </div>
+    <div class="nav-back">
+      <a href="../../../" title>← Conversations index</a>
+    </div>
+  </footer>
+</article>
+
+      </div><!-- #content -->
+    </div><!-- #container -->
+
+    <div id="footer">
+    </div><!-- #footer -->
+  </div><!-- #wrapper .hfeed -->
+</body>
+</html>

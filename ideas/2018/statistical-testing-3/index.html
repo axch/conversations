@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href="https://fonts.googleapis.com/css?family=Merriweather+Sans:800,400italic|Inconsolata:400|Merriweather:400,400italic" rel="stylesheet" type="text/css">
+
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta content="width=device-width" name="viewport">
+  <title>Statistical Testing 3</title>
+
+  
+  <meta name="author" content="Alexey Radul" />
+  
+
+  <link rel="stylesheet" type="text/css" href="../../../css/erudite.css" />
+  <link rel="icon" href="../../../favicon.ico" />
+  <link rel="alternate" type="application/rss+xml" title="Conversations Updates -- RSS" href="../../../feed.xml" />
+  
+</head>
+
+<body>
+
+  <div id="wrapper" class="hfeed">
+    <div id="header-wrap">
+      <div id="header" role="banner">
+        <h1 id="blog-title"><span><a href="../../../" title rel="home">Conversations</a></span></h1>
+        <div id="blog-description"></div>
+      </div><!--  #header -->
+      <div id="access" role="navigation">
+        <div class="skip-link"><a href="#content" title></a></div>
+      </div><!-- #access -->
+    </div><!--  #header-wrap -->
+
+    <div id="container">
+      <div id="content" role="main">
+        <article class="hentry" itemscope itemtype="http://schema.org/BlogPosting">
+  
+  <header>
+    <h2 class="entry-title" itemprop="name">Statistical Testing 3</h2>
+  </header>
+
+  <div class="entry-meta">
+
+    <span class="entry-date">
+      <abbr class="published">December 23, 2018</abbr>
+    </span>
+    <span class="author vcard">
+      By Alexey Radul
+    </span>
+  </div>
+
+  <div class="entry-content" itemprop="articleBody">
+    <p>Previously in this miniseries on testing samplers, I <a href="../../../ideas/2016/on-testing-probabilistic-programs/">laid out the
+problem</a> that
+statistical testing is inherently more fraught than conventional
+software testing, and <a href="../../../ideas/2017/compositional-statistical-unit-testing/">set up a basic
+framework</a> for
+defining dependable error-calibrated statistical tests of
+stochastic software. I have since learned a great
+inequality, and can now lay out a
+more complete set of practical basic tests.</p>
+<p>To recap, the problem with testing samplers is that even a correct
+sampler can emit arbitrarily weird-looking output by sheer chance, and
+even a badly incorrect one can accidentally produce a good-looking run
+during testing. There’s hope, though: the probability of weird
+stuff falls as one draws more samples, and as one loosens the
+threshold of what counts as “weird”. So the general strategy for
+testing samplers is to draw so many samples, and to fail the test only
+on results that are so outlandish, that the probability of a correct
+code base triggering a failure in the test suite by chance becomes
+negligible; say <span class="math inline">\(10^{-9}\)</span>.</p>
+<p>So our statistical test suite passes. Does that mean we’re done? No,
+because we also need to make sure that <em>incorrect</em> code has a
+negligible probability of <em>not</em> triggering a test failure.
+Unfortunately, this can’t be done perfectly: no matter how many
+samples we draw, and no matter how tightly we set the criteria for each
+test passing, it’s always possible to have a bug whose effects are so
+mild or so rare that our test suite can’t reliably detect it. The best we
+can do is <em>calibrate</em>: compute the “size” of the mistake we can
+reliably detect, and draw enough samples to drive that size small
+enough to give us confidence that our software is, in fact, correct.</p>
+<p>So, how many samples is “enough”? The technical component of that
+problem is the subject of this post. Let us
+focus today on one-dimensional continuous testing. That’s not as
+restrictive as it may at first seem, because much can be learned about
+multivariate distributions by composing multiple tests on projections
+(or other probe functions); and discrete spaces can, as a last
+resort, be embedded into <span class="math inline">\(\R\)</span> by adding an ordering on the elements.
+There are also facts and algorithms that can be used for discrete stuff,
+but that will have to wait for another post.</p>
+<h2 id="contents">Contents</h2>
+<ul>
+<li><a href="#the-inequality">The Inequality</a></li>
+<li><a href="#the-tests">The Tests</a>
+<ul>
+<li><a href="#goodness-of-fit-vs-k-s-distance">Goodness of Fit</a></li>
+<li><a href="#k-s-tolerant-goodness-of-fit-vs-k-s-distance">Tolerant Goodness of Fit</a></li>
+<li><a href="#equality-in-distribution-vs-k-s-distance">Equality</a></li>
+<li><a href="#k-s-tolerant-equality-in-distribution">Nearness</a></li>
+<li><a href="#bounds-on-the-mean-and-other-statistics">Mean Bounds</a></li>
+<li><a href="#sampler-density-agreement">Sampler-Density Agreement</a></li>
+</ul></li>
+<li><a href="#the-performance">The Performance</a></li>
+<li><a href="#the-alternatives">The Alternatives</a></li>
+<li><a href="#the-summary">The Summary</a></li>
+<li><a href="#the-notes">The Notes</a></li>
+</ul>
+<h2 id="the-inequality">The Inequality</h2>
+<p>Without further ado, suppose we have some sampler <span class="math inline">\(s\)</span> that emits
+real-valued samples <span class="math inline">\(x_i \in \R\)</span> and we want to check its properties.
+The workhorse for this setting is the <a href="https://en.wikipedia.org/wiki/Dvoretzky%E2%80%93Kiefer%E2%80%93Wolfowitz_inequality">Dvoretzky-Keifer-Wolfowitz
+inequality</a>.
+It was originally proven by the eponymous mathematicians in 1956 with
+an unknown constant. It became unquestionably practically usable for statistical
+testing in 1990, when <a href="https://projecteuclid.org/euclid.aop/1176990746">P. Massart determined</a> the constant to be 2.</p>
+<p>The inequality gives a stochastic bound on the discrepancy between the
+sampler’s true cumulative distribution function (CDF) <span class="math inline">\(F\)</span> and the
+empirical cumulative distribution function <span class="math inline">\(F_n\)</span> obtained from drawing
+<span class="math inline">\(n\)</span> independent samples:</p>
+<p><span class="math display">\[ \Pr\left(\sup_{x \in \R}|F_n(x) - F(x)| &gt; \eps\right) \leq 2e^{-2n\eps^2}. \]</span></p>
+<p>The bounded supremum of the left hand side is called the
+<a href="https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test">Kolmogorov-Smirnov
+distance</a>
+(K-S for short), in this case between the true and empirical CDFs.
+The bound is an upper bound on the probability of this distance being large.
+The important thing for our purposes is that this bound holds for
+finite sample counts <span class="math inline">\(n\)</span> rather than just asymptotically. We will use
+it to turn empirical samples into confidence envelopes on the true CDF
+they were drawn from, for example like this:</p>
+<div style="width:100%">
+<p><img src="DKW_bounds.svg" width="200%" /></p>
+</div>
+<p>The blue staircase is an example empirical CDF, whose true CDF is, in
+this case, the smooth curve in orange. The DKM(W) inequality lets us
+form the confidence envelope in purple, and bounds the probability
+that the true CDF escapes it.</p>
+<h2 id="the-tests">The Tests</h2>
+<p>Armed with the DKW(M) inequality, we can form an array of calibrated
+statistical tests for various situations.</p>
+<h3 id="goodness-of-fit-vs-k-s-distance">Goodness of Fit vs K-S Distance</h3>
+<p>Suppose the target CDF <span class="math inline">\(F\)</span> is analytically and computationally
+tractable (e.g., we are trying to test a sampler for something like
+the <a href="https://en.wikipedia.org/wiki/Gamma_distribution">Gamma
+distribution</a>).
+Then two applications of DKW(M) give a calibrated test that the
+program <span class="math inline">\(s\)</span> samples from <span class="math inline">\(F\)</span>.</p>
+<p>The test has two parameters, <span class="math inline">\(n\)</span> and <span class="math inline">\(\eps\)</span>. The test procedure is to</p>
+<ol type="1">
+<li>Draw <span class="math inline">\(n\)</span> samples from <span class="math inline">\(s\)</span>;</li>
+<li>Form the empirical CDF <span class="math inline">\(F_n\)</span>;</li>
+<li>Compute the K-S distance
+<span class="math inline">\(d = \sup_{x \in \R}|F_n(x) - F(x)|;\)</span> then</li>
+<li>Pass if <span class="math inline">\(d \leq \eps\)</span> and fail otherwise.</li>
+</ol>
+<p>To analyze this as a calibrated test, we need an additional (purely
+analytic) parameter <span class="math inline">\(\delta\)</span>, for the K-S distance from correctness.
+We derive the test’s pass/fail properties as follows:</p>
+<ul>
+<li><p>The test should pass when <span class="math inline">\(s\)</span> samples from exactly <span class="math inline">\(F\)</span>.</p></li>
+<li><p>Applying DKW(M) to <span class="math inline">\(F\)</span> and <span class="math inline">\(F_n\)</span> directly gives an upper bound on the
+false-failure rate <span class="math inline">\(\alpha\)</span> of this test, giving
+<span class="math display">\[\alpha \leq 2e^{-2n\eps^2}.\]</span></p></li>
+<li><p>The test should fail when the true CDF <span class="math inline">\(G\)</span> of <span class="math inline">\(s\)</span> differs in K-S
+distance from <span class="math inline">\(F\)</span> by at least <span class="math inline">\(\delta + \eps\)</span>.</p></li>
+<li><p>For the test to pass, the empirical CDF <span class="math inline">\(F_n\)</span> has to fall within
+<span class="math inline">\(\eps\)</span> of <span class="math inline">\(F\)</span>. For this to happen when the test should fail, the
+empirical CDF has to fall least <span class="math inline">\(\delta\)</span> from its actual CDF
+<span class="math inline">\(G\)</span>. Applying DKW(M) to <span class="math inline">\(G\)</span> and <span class="math inline">\(F_n\)</span> therefore bounds the false
+pass rate <span class="math inline">\(\beta\)</span>:
+<span class="math display">\[ \begin{align*}
+\beta &amp; = \Pr\left(\sup_{x \in \R}|F_n(x) - F(x)| \leq \eps\right) \\
+      &amp; \leq \Pr\left(\sup_{x \in \R}|F_n(x) - G(x)| &gt; \delta\right) \\
+      &amp; \leq 2e^{-2n\delta^2}.
+\end{align*} \]</span></p></li>
+</ul>
+<p>To decide how many samples to draw, then, it suffices to choose
+acceptable error rates <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\beta\)</span>, and an acceptable
+guarantee gap <span class="math inline">\(\eps + \delta\)</span>, and solve the above inequalities for
+<span class="math inline">\(n\)</span> and <span class="math inline">\(\eps\)</span>.</p>
+<h3 id="k-s-tolerant-goodness-of-fit-vs-k-s-distance">K-S Tolerant Goodness of Fit vs K-S Distance</h3>
+<p>The previous procedure can also be viewed as a test for approximate
+equality under K-S distance, namely a test that the true CDF of the
+sampler <span class="math inline">\(s\)</span> does not differ in K-S distance from the target CDF <span class="math inline">\(F\)</span> by
+more than a tolerance <span class="math inline">\(\zeta &lt; \eps\)</span>. This <span class="math inline">\(\zeta\)</span> is an analytic
+parameter: its only effect is to change the definition of when the
+test should pass to include all CDFs within <span class="math inline">\(\zeta\)</span> of <span class="math inline">\(F\)</span>, and change
+the false failure rate bound to
+<span class="math display">\[ \alpha \leq 2e^{-2n(\eps - \zeta)^2}. \]</span></p>
+<p>Stands to reason: If we widen the definition of “should pass” to
+include everything up to <span class="math inline">\(\zeta\)</span>, the chance of something that should
+pass producing a result more than <span class="math inline">\(\eps\)</span> away increases.</p>
+<h3 id="equality-in-distribution-vs-k-s-distance">Equality in Distribution vs K-S Distance</h3>
+<p>We can use the same inquality to construct a calibrated test that two
+samplers <span class="math inline">\(s_1\)</span> and <span class="math inline">\(s_2\)</span> are sampling from the same (one-dimensional)
+distribution.</p>
+<p>The test again has two parameters, <span class="math inline">\(n\)</span> and <span class="math inline">\(\eps\)</span>. The test procedure
+is, of course, very similar to the last one:</p>
+<ol type="1">
+<li>Draw <span class="math inline">\(n\)</span> samples from <span class="math inline">\(s_1\)</span> and <span class="math inline">\(n\)</span> samples from <span class="math inline">\(s_2\)</span>;</li>
+<li>Form the empirical CDFs <span class="math inline">\(F_{1n}\)</span> and <span class="math inline">\(F_{2n}\)</span>;</li>
+<li>Compute the K-S distance
+<span class="math inline">\(d = \sup_{x \in \R}|F_{1n}(x) - F_{2n}(x)|;\)</span> then</li>
+<li>Pass if <span class="math inline">\(d \leq \eps\)</span> and fail otherwise.</li>
+</ol>
+<p>The analysis differs only in that each bound forces us to use DKW(M)
+twice. We again use the distance from correctness <span class="math inline">\(\delta\)</span>, and
+obtain</p>
+<ul>
+<li><p>The test should pass when <span class="math inline">\(s_1\)</span> and <span class="math inline">\(s_2\)</span> both sample from some unknown CDF <span class="math inline">\(G\)</span>.</p></li>
+<li><p>Suppose this is so. Suppose the K-S distances of the obtained
+empirical samples <span class="math inline">\(F_{1n}\)</span> and <span class="math inline">\(F_{2n}\)</span> from <span class="math inline">\(G\)</span> are <span class="math inline">\(d_1\)</span> and <span class="math inline">\(d_2\)</span>,
+respectively. Then for the test to fail, we must have <span class="math inline">\(d_1 + d_2
+\geq d &gt; \eps\)</span>. Then, applying DKW(M) to <span class="math inline">\(F_{1n}\)</span> and <span class="math inline">\(G\)</span> and to
+<span class="math inline">\(F_{2n}\)</span> and <span class="math inline">\(G\)</span>, we bound<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> the false failure rate <span class="math inline">\(\alpha\)</span> as
+<span class="math display">\[ \begin{align*}
+\alpha &amp; = \Pr\left(\sup_{x \in \R}|F_{1n}(x) - F_{2n}(x)| &gt; \eps\right) \\
+&amp; \leq \Pr\left(\sup_{x \in \R}|F_{1n}(x) - G(x)| &gt; d_1\right) \cdot
+       \Pr\left(\sup_{x \in \R}|F_{2n}(x) - G(x)| &gt; d_2\right) \\
+&amp; \leq 2e^{-2nd_1^2} 2e^{-2nd_2^2} \\
+&amp; \leq 4e^{-2n\eps^2}.
+\end{align*} \]</span></p></li>
+<li><p>The test should fail when <span class="math inline">\(s_1\)</span> samples from some unknown CDF <span class="math inline">\(G_1\)</span>,
+<span class="math inline">\(s_2\)</span> samples from the equally unknown <span class="math inline">\(G_2\)</span>, and the K-S distance
+between <span class="math inline">\(G_1\)</span> and <span class="math inline">\(G_2\)</span> is at least <span class="math inline">\(\eps + \delta\)</span>.</p></li>
+<li><p>Suppose this is so, and suppose again that the obtained K-S
+distances between the empirical samples and their respective CDFs
+are <span class="math inline">\(d_1\)</span> and <span class="math inline">\(d_2\)</span>. Then, for the test to pass by chance, we must
+have <span class="math inline">\(\eps + \delta \leq d_1 + \eps + d_2\)</span>. By the same double
+application of DKW(M), that gives us a false pass rate bound of
+<span class="math display">\[ \beta \leq 4e^{-2n\delta^2}. \]</span></p></li>
+</ul>
+<p>Deciding how many samples to draw is again a matter of finding some
+<span class="math inline">\(n\)</span> and <span class="math inline">\(\eps\)</span> that yield acceptable error rates <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(\beta\)</span>,
+and an acceptable guarantee gap <span class="math inline">\(\eps + \delta\)</span>.<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a></p>
+<h3 id="k-s-tolerant-equality-in-distribution">K-S Tolerant Equality in Distribution</h3>
+<p>We obtain the tolerant version exactly the same way as when the target
+CDF <span class="math inline">\(F\)</span> is known. To wit, if we wish to declare that the test should pass when
+<span class="math inline">\(G_1\)</span> and <span class="math inline">\(G_2\)</span> differ in K-S distance by at most <span class="math inline">\(\zeta &lt; \eps\)</span>,
+we find that the same test procedure yields
+<span class="math display">\[ \alpha \leq 4e^{-2n(\eps - \zeta)^2}. \]</span></p>
+<h3 id="bounds-on-the-mean-and-other-statistics">Bounds on the Mean and Other Statistics</h3>
+<p>So much for equality in distribution. But with more complex samplers,
+we often don’t have useful distributional invariants to work from.
+Fortunately, we do often analytically know what the mean of one or
+another probe should be, and DKW(M) gives a way to test that, too.</p>
+<p>The critical observation is that, if the support of <span class="math inline">\(s\)</span> has an upper
+bound, then a confidence envelope on the true CDF also gives a
+confidence bound on the mean. Indeed, if the true CDF is within an
+<span class="math inline">\(\eps\)</span> envelope of the empirical CDF, then it only has <span class="math inline">\(\eps\)</span>
+probability mass of freedom. The most it could do to push the empirical mean up
+would be to put all that mass on the upper limit of the support, and
+we can efficiently compute what mean that would lead to. Likewise for
+lower bounds. The computation is very simple.<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a> In pseudo-code</p>
+<pre><code>def maximum_mean(samples, eps, upper_bound):
+  n = len(samples)
+  samples_left = ... # discard eps * n smallest samples
+  return mean(samples_left) + eps * upper_bound</code></pre>
+<p>From this, we can derive calibrated tests on the mean of a sampler.
+We can test whether the mean is some known value, or lies in some
+known interval (vs lying at least <span class="math inline">\(\delta\)</span> away); we can also test
+whether the means of two samplers are equal, or within <span class="math inline">\(\zeta\)</span> of each
+other (vs being at least <span class="math inline">\(\zeta + \delta\)</span> away). This also scales
+cleanly to arbitrary-dimensional distributions, because a vector mean
+is determined by its projections.</p>
+<p>The same trick also works for the median, and arbitrary percentiles.
+Similar games also give probabilistic bounds on <a href="https://doi.org/10.1081%2Fsta-120006065">the
+variance</a>, <a href="https://arxiv.org/abs/cs/0504091">the
+entropy</a>, and <a href="https://doi.org/10.1162%2Fneco_a_00144">mutual
+information</a>.</p>
+<h3 id="sampler-density-agreement">Sampler-Density Agreement</h3>
+<p>One specific application I find relevant in my capacity as maintainer
+of a statistical library is checking whether a (multivariate) sampler
+<span class="math inline">\(s\)</span> samples according to a given density function <span class="math inline">\(f\)</span>. In the univariate
+case, we typically have the CDF, so we can just use the equality in
+distribution test.</p>
+<p>CDFs don’t really work for multivariate distributions, but there is still
+something we can do. Suppose for the moment that the support of
+the distribution is the compact set <span class="math inline">\(S \subset \R^n\)</span>, with known
+volume <span class="math inline">\(|S|\)</span>. Suppose further that the density <span class="math inline">\(f\)</span> is bounded away from zero on <span class="math inline">\(S\)</span>,
+i.e., we have a positive real number <span class="math inline">\(h\)</span> for which <span class="math inline">\(\forall x \in S, f(x) &gt; h\)</span>.
+Then we have an interesting invariant we can use.</p>
+<p>The trick is to estimate the volume of <span class="math inline">\(S\)</span> by using the testee <span class="math inline">\(s\)</span> as
+a proposal for an importance sampler. If <span class="math inline">\(s\)</span> is really sampling
+according to the density <span class="math inline">\(f\)</span>, the mean weight will be the volume
+<span class="math inline">\(|S|\)</span>. To wit, consider the distribution on real numbers given by
+<span class="math inline">\(1/f(x)\)</span> for <span class="math inline">\(x\)</span> drawn from <span class="math inline">\(s\)</span>. What is its mean? If <span class="math inline">\(s\)</span> is
+sampling according to the probability density <span class="math inline">\(f\)</span>, we will have
+<span class="math display">\[ \E_{x \sim s}\left[\frac{1}{f(x)}\right] = \int_S \frac{1}{f(x)} f(x) dx = \int_S 1 dx = |S|. \]</span>
+The distribution on <span class="math inline">\(1/f(x)\)</span> is of course bounded below by <span class="math inline">\(0\)</span>, and our lower
+bound <span class="math inline">\(h\)</span> on <span class="math inline">\(f\)</span> turns into an upper bound <span class="math inline">\(1/h\)</span> on <span class="math inline">\(1/f\)</span>, so we can proceed to
+test this invariant using the mean confidence intervals we worked out
+previously. It’s not a perfect check (e.g., <span class="math inline">\(s\)</span> is free to mis-weight
+points within any equal-value levels of <span class="math inline">\(f\)</span>), but it’s better than
+nothing.</p>
+<p>Even if the support of the distribution we are interested in is not
+compact, or if the density approaches <span class="math inline">\(0\)</span>, we can still salvage
+something by testing a restriction of the distribution of interest.
+The only non-mechanical part is choosing a restriction domain and
+proving a lower bound on the density within that domain.</p>
+<h2 id="the-performance">The Performance</h2>
+<p>The measure of speed for our statistical tests is <span class="math inline">\(n\)</span>, the number of
+samples we have to draw from <span class="math inline">\(s\)</span>. As you can see from the above
+results, this will be logarithmic in the desired error rates, so there
+isn’t much reason to tolerate flakiness. Unfortunately, the
+performance is also quadratic in the test resolution <span class="math inline">\(1/\eps\)</span>. This
+comes from the <span class="math inline">\(n\eps^2\)</span> term in the exponent of the DKW(M) bound. I
+don’t know that there’s much that can be done about that, except to
+keep the computational cost in mind when setting one’s test
+resolutions. In particular, the Law of Large Numbers suggests that a
+precision of <span class="math inline">\(O\left(\sqrt{n}\right)\)</span> is about what we should expect where sums
+are involved.</p>
+<h2 id="the-alternatives">The Alternatives</h2>
+<p>There are other inequalities on which finite-sample statistical
+testing can be based. In a <a href="../../../ideas/2017/compositional-statistical-unit-testing/">previous
+post</a> I worked
+out a test for binary probability distributions based on the CDF of
+the binomial distribution. There is also a rich literature of other
+so-called “property testing” algorithms, including a very nice survey
+of methods applicable to discrete distributions in Gautam Kamath’s MIT
+doctoral dissertation <a href="http://www.gautamkamath.com/phdthesis.pdf">“Modern Challenges in Distribution
+Testing”</a> (September 2018).</p>
+<p>The one point I would like to bring up from there is that different
+methods are sensitive to different notions of distance in
+distribution, and have different sample efficiency. For example,
+consider testing whether a sampler <span class="math inline">\(s\)</span> samples from a given discrete
+distribution on <span class="math inline">\(M\)</span> objects. One approach would be to choose an
+ordering on those objects, embed them in the interval <span class="math inline">\([0, M) \subset
+\R\)</span>, and use the DKW(M)-based continuous test given at the beginning
+of this post. This will detect discrepancies exceeding <span class="math inline">\(\eps\)</span>
+Kolmogorov-Smirnov distance in <span class="math inline">\(O\left(1/\eps^2\right)\)</span> samples.</p>
+<p>Alternately, Gautam gives a test that detects discrepancies exceeding
+<span class="math inline">\(\eps\)</span> total variation distance in <span class="math inline">\(O\left(\sqrt{M}/\eps^2\right)\)</span> samples, and
+refers to a proof that this is asymptotically optimal.<a href="#fn4" class="footnote-ref" id="fnref4" role="doc-noteref"><sup>4</sup></a>
+This test can of course also be applied to (even multidimensional)
+continuous distributions by binning. Depending on which distance is
+more salient to the types of software errors one’s test suite is
+looking for, one method or another can give favorable
+performance.</p>
+<h2 id="the-summary">The Summary</h2>
+<p>In this post, we studied the Dvoretzky-Keifer-Wolfowitz (and Massart)
+inequality, and worked out how to use it for a wide variety of
+calibrated statistical tests for checking correctness of samplers.
+DKW(M) leads to simple test procedures with exact finite-sample
+guarantees on both false fail and false pass rates.</p>
+<p>While DKW(M) is straightforward and general, tests based on other
+inequalities may yield better sample efficiency and/or more intuitive
+notions of distribution distance in the situations where they apply.</p>
+<h2 id="the-notes">The Notes</h2>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script type="text/javascript">
+MathJax.Hub.Config({
+  TeX: {
+    Macros: {
+      R: "{\\mathbb{R}}",
+      Pr: "{\\mathrm{Pr}}",
+      E: "\\mathbb{E}",
+      eps: "\\varepsilon"
+    }
+  }
+});
+</script>
+<section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p>I conjecture that the 4 in the final bound can be
+brought down by using the one-sided version of the DKW(M) inequality,
+and taking advantage of the fact that <span class="math inline">\(s_1\)</span> and <span class="math inline">\(s_2\)</span> have to deviate
+from <span class="math inline">\(G\)</span> in opposite directions to cause this test procedure to fail.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>If one of <span class="math inline">\(s_1\)</span> or <span class="math inline">\(s_2\)</span> is significantly more
+expensive to sample from than the other, it’s possible to squeeze a
+little performance out of drawing more samples from the cheaper one,
+rather than the same <span class="math inline">\(n\)</span> from each. I leave that extension for the
+intrepid reader to work out on their own.<a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3"><p>The only tricky thing is that, if <span class="math inline">\(\eps n\)</span> is not an
+integer, we should keep that sample, but down-weight it in the mean
+computation. The point is to discard <span class="math inline">\(\eps\)</span> worth of probability mass
+from the empirical sample before taking its mean, and then to add back
+the upper bound of the support, weighted by <span class="math inline">\(\eps\)</span>.<a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn4"><p>These results are consistent with each other, because a
+potentially large total variation distance can still look like a small
+Kolmogorov-Smirnov distance, if the ordering lines up wrong. Indeed,
+TVD can be <span class="math inline">\(O(M)\)</span> times larger than K-S between the same two
+distributions.<a href="#fnref4" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+  </div>
+
+  <footer>
+    <div class="metadata">
+    </div>
+    <div class="nav-back">
+      <a href="../../../" title>← Conversations index</a>
+    </div>
+  </footer>
+</article>
+
+      </div><!-- #content -->
+    </div><!-- #container -->
+
+    <div id="footer">
+    </div><!-- #footer -->
+  </div><!-- #wrapper .hfeed -->
+</body>
+</html>

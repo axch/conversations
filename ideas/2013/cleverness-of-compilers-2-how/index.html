@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href="https://fonts.googleapis.com/css?family=Merriweather+Sans:800,400italic|Inconsolata:400|Merriweather:400,400italic" rel="stylesheet" type="text/css">
+
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta content="width=device-width" name="viewport">
+  <title>Cleverness of Compilers 2: How</title>
+
+  
+  <meta name="author" content="Alexey Radul" />
+  
+
+  <link rel="stylesheet" type="text/css" href="../../../css/erudite.css" />
+  <link rel="icon" href="../../../favicon.ico" />
+  <link rel="alternate" type="application/rss+xml" title="Conversations Updates -- RSS" href="../../../feed.xml" />
+  
+</head>
+
+<body>
+
+  <div id="wrapper" class="hfeed">
+    <div id="header-wrap">
+      <div id="header" role="banner">
+        <h1 id="blog-title"><span><a href="../../../" title rel="home">Conversations</a></span></h1>
+        <div id="blog-description"></div>
+      </div><!--  #header -->
+      <div id="access" role="navigation">
+        <div class="skip-link"><a href="#content" title></a></div>
+      </div><!-- #access -->
+    </div><!--  #header-wrap -->
+
+    <div id="container">
+      <div id="content" role="main">
+        <article class="hentry" itemscope itemtype="http://schema.org/BlogPosting">
+  
+  <header>
+    <h2 class="entry-title" itemprop="name">Cleverness <em>of</em> Compilers <em>2:</em> How</h2>
+  </header>
+
+  <div class="entry-meta">
+
+    <span class="entry-date">
+      <abbr class="published">October 10, 2013</abbr>
+    </span>
+    <span class="author vcard">
+      By Alexey Radul
+    </span>
+  </div>
+
+  <div class="entry-content" itemprop="articleBody">
+    <p>The <a href="../../../ideas/2013/cleverness-of-compilers/">Cleverness of Compilers</a>
+essay described the name of the hyperaggressive compilation game in
+broad, philosophical strokes. Here, I would like to walk through the
+Mandelbrot example in some detail, so that the interested reader may
+see one particular way to actually accomplish that level of
+optimization. There are of course other approaches to the
+same goal, and the present approach (as well as its implementation)
+leaves plenty of desiderata unfilled. It is, nevertheless, one way to
+do it.</p>
+<p>As a reminder, the task is to turn this modular Mandelbrot program</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode scheme"><code class="sourceCode scheme"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">;;; Complex arithmetic library</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>(c:+ z1 z2)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">cons</span> (<span class="op">+</span> (<span class="kw">car</span> z1) (<span class="kw">car</span> z2))</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>        (<span class="op">+</span> (<span class="kw">cdr</span> z1) (<span class="kw">cdr</span> z2))))</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>(c:* z1 z2)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">cons</span> (<span class="op">-</span> (<span class="op">*</span> (<span class="kw">car</span> z1) (<span class="kw">car</span> z2))</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>           (<span class="op">*</span> (<span class="kw">cdr</span> z1) (<span class="kw">cdr</span> z2)))</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>        (<span class="op">+</span> (<span class="op">*</span> (<span class="kw">car</span> z1) (<span class="kw">cdr</span> z2))</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>           (<span class="op">*</span> (<span class="kw">cdr</span> z1) (<span class="kw">car</span> z2)))))</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> c:0 </span>(<span class="kw">cons</span> (real <span class="dv">0</span>) (real <span class="dv">0</span>)))</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>(<span class="kw">magnitude</span> z)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">sqrt</span> (<span class="op">+</span> (<span class="op">*</span> (<span class="kw">car</span> z) (<span class="kw">car</span> z))</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>           (<span class="op">*</span> (<span class="kw">cdr</span> z) (<span class="kw">cdr</span> z)))))</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="co">;;; Iteration library</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>(iterate count f x)</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">if</span> (<span class="op">&lt;=</span> count <span class="dv">0</span>)</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>      x</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>      (iterate (<span class="op">-</span> count <span class="dv">1</span>) f (f x))))</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="co">;;; Mandelbrot set membership test</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>((step c) z)</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>  (c:+ (c:* z z) c))</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>(mandelbrot? c)</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>  (<span class="op">&lt;</span> (<span class="kw">magnitude</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>      (iterate (real <span class="dv">400</span>) (step c) c:0))</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>     <span class="dv">2</span>))</span></code></pre></div>
+<p>into this efficient, browser-executable one</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">fol_program</span>(stdlib<span class="op">,</span> foreign<span class="op">,</span> heap) {</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">&quot;use asm&quot;</span><span class="op">;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">var</span> heap_view <span class="op">=</span> <span class="kw">new</span> stdlib<span class="op">.</span><span class="fu">Float32Array</span>(heap)<span class="op">;</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">var</span> sqrt <span class="op">=</span> stdlib<span class="op">.</span><span class="at">Math</span><span class="op">.</span><span class="at">sqrt</span><span class="op">;</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  <span class="kw">function</span> <span class="fu">operation_231</span>(count<span class="op">,</span> f_env_1<span class="op">,</span> f_env_2<span class="op">,</span> x_1<span class="op">,</span> x_2) {</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    count <span class="op">=</span> <span class="op">+</span>count<span class="op">;</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    f_env_1 <span class="op">=</span> <span class="op">+</span>f_env_1<span class="op">;</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    f_env_2 <span class="op">=</span> <span class="op">+</span>f_env_2<span class="op">;</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    x_1 <span class="op">=</span> <span class="op">+</span>x_1<span class="op">;</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    x_2 <span class="op">=</span> <span class="op">+</span>x_2<span class="op">;</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (count <span class="op">&lt;=</span> <span class="fl">0.0</span>) {</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>      heap_view[<span class="dv">0</span>] <span class="op">=</span> x_1<span class="op">;</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>      heap_view[<span class="dv">1</span>] <span class="op">=</span> x_2<span class="op">;</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>      <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    } <span class="cf">else</span> {</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>      <span class="cf">return</span> <span class="fu">operation_231</span>(count <span class="op">-</span> <span class="fl">1.0</span><span class="op">,</span> f_env_1<span class="op">,</span> f_env_2<span class="op">,</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>                           ((x_1<span class="op">*</span>x_1 <span class="op">-</span> x_2<span class="op">*</span>x_2) <span class="op">+</span> f_env_1)<span class="op">,</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>                           ((x_1<span class="op">*</span>x_2 <span class="op">+</span> x_2<span class="op">*</span>x_1) <span class="op">+</span> f_env_2))<span class="op">;</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>  <span class="kw">function</span> <span class="fu">__main__</span>(c_1<span class="op">,</span> c_2) {</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    c_1 <span class="op">=</span> <span class="op">+</span>c_1<span class="op">;</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    c_2 <span class="op">=</span> <span class="op">+</span>c_2<span class="op">;</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> ret_x <span class="op">=</span> <span class="fl">0.0</span><span class="op">;</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    <span class="kw">var</span> ret_y <span class="op">=</span> <span class="fl">0.0</span><span class="op">;</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>    <span class="fu">operation_231</span>(<span class="fl">400.0</span><span class="op">,</span> c_1<span class="op">,</span> c_2<span class="op">,</span> <span class="fl">0.0</span><span class="op">,</span> <span class="fl">0.0</span>)<span class="op">;</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>    ret_x <span class="op">=</span> <span class="op">+</span>heap_view[<span class="dv">0</span>]<span class="op">;</span></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>    ret_y <span class="op">=</span> <span class="op">+</span>heap_view[<span class="dv">1</span>]<span class="op">;</span></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> (<span class="op">+</span><span class="fu">sqrt</span>(ret_x<span class="op">*</span>ret_x <span class="op">+</span> ret_y<span class="op">*</span>ret_y) <span class="op">&lt;</span> <span class="fl">2.0</span>)<span class="op">|</span><span class="dv">0</span><span class="op">;</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>  <span class="cf">return</span> __main__<span class="op">;</span></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>In the <a href="https://github.com/axch/dysvunctional-language">DysVunctional Language
+compiler</a>, this task
+happens in four steps:</p>
+<dl>
+<dt><a href="#flow-analysis">Flow analysis</a></dt>
+<dd>
+<p>converts the input program into a form where all the
+specialization is explicit, and the contextual information
+relevant to each specialized code point is immediately available.
+In keeping with an unfortunate tradition, both the process and the
+result is called an “analysis”.</p>
+</dd>
+<dt><a href="#code-generation">Code generation</a></dt>
+<dd>
+<p>converts the result of flow analysis (without reference to the
+original program) into code in FOL, a First-Order intermediate
+Language, where all types and control flow are explicit (all
+function calls are to statically apparent targets).</p>
+</dd>
+<dt><a href="#further-optimization">Further optimization</a></dt>
+<dd>
+<p>optimizes the intermediate FOL program with (aggressive versions
+of) standard methods, to which FOL is well suited because of its
+restricted nature.</p>
+</dd>
+<dt><a href="#backend-translation">Backend translation</a></dt>
+<dd>
+<p>translates the optimized FOL program to asm.js syntax. FOL is
+sufficiently low-level for this not to be too complicated.</p>
+</dd>
+</dl>
+<p>The plan for this essay is to walk through all four of these
+operations as they apply to this example program.</p>
+<h2 id="flow-analysis">Flow Analysis</h2>
+<p>The flow analysis in DVL is an abstract interpretation of the input
+program.<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> An <em>abstract interpretation</em> of a program consists of
+executing (<em>interpreting</em>) the program, except that instead of the
+variables and data structures holding the values the program actually
+computes, they hold <em>abstract values</em>—representations of sets of
+possible values that could occur during various runs of the program.
+The idea is that one abstract value or abstract program state captures
+some commonality of many possible actual values or program states
+but ignores (<em>abstracts from</em>) the residual variation among them.</p>
+<blockquote class="pullquote-display">
+<p>
+Reusable code is written to be able to consume huge
+varieties of stuff, but any given use will only feed it some
+restricted diet.
+</p>
+</blockquote>
+<p>If we do a good job of picking what commonality to represent and what
+variation to ignore, it is possible to compute a consistent model of
+all possible executions of the source program. This
+model then gives information about what values each part of the program
+may produce, and therefore what the consumers of that part may
+have to consume. Figuring that out is extremely valuable for
+optimization because general-purpose, reusable code is written to be
+able to consume huge varieties of stuff (that’s why it’s called
+“general-purpose”), but any given use will only feed it some
+restricted diet. For instance, the <code>iterate</code> in our Mandelbrot
+program is only ever told to iterate one specific type of function,
+namely <code>(step c)</code> for various complex numbers <code>c</code>, even though it was
+written to be able to iterate absolutely anything. Discovering this use pattern
+opens the door to a plethora of optimizations.</p>
+<p>How do we do abstract interpretation on DVL? Since the DVL input
+language is functional,<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a> the state of execution of any
+program is completely determined by the expression being evaluated and
+the environment in which to evaluate it, or, alternately, by the
+procedure being invoked and the arguments with which to invoke it. We
+can represent a whole class of executions of a DVL program by allowing
+the values in such a state to be abstract; and we can simulate it with
+a suitably modified interpreter that respects and appropriately
+propagates the variation the abstract state permits, while deducing as
+much as possible from the commonalities among states that the
+abstraction exposes.</p>
+<p>Without further ado, the following slideshow illustrates how flow
+analysis by abstract interpretation proceeds on (an interesting part
+of) our example <code>mandelbrot?</code> program.</p>
+<center>
+<iframe class="frame" width="540" height="590" src="embedder.html#animated-analysis.html">
+<a href="../../../animated-analysis.html">the analysis as a standalone
+page</a>
+</iframe>
+</center>
+<p>
+</p>
+<p>At the end of the flow analysis process (it ends on the Mandelbrot
+example, but in general DVL relies on correct use of the <code>real</code>
+primitive to ensure that abstract evaluation terminates), we have an
+analysis data structure holding a bunch of information like this:</p>
+<p><span class="math display">\[ \begin{eqnarray*}
+\exp{(iterate (real 400) (step c) c:0)}, \env{1} &amp; \mapsto &amp; \RR \\
+\obj{iterate}, \R, \obj{closure1}, \RR &amp; \mapsto &amp; \RR \\
+\exp{(&lt;= count 0)}, \env{2} &amp; \mapsto &amp; \B \\
+\obj{closure1}, \RR &amp; \mapsto &amp; \RR \\
+\textrm{etc} &amp; &amp;
+\end{eqnarray*} \]</span>
+These entries tell us that</p>
+<ul>
+<li><p>The expression <span class="math inline">\(\exp{(iterate ...)}\)</span>, evaluated in any environment
+of the same shape<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a> as <span class="math inline">\(\env{1}\)</span>, should be treated as though it
+returns a pair of arbitrary real numbers;</p></li>
+<li><p>The procedure <span class="math inline">\(\obj{iterate}\)</span>, when applied to any triple of
+arguments consisting of any real number, any procedure of the same
+shape as <span class="math inline">\(\obj{closure1}\)</span>, and any pair holding any two real
+numbers, should be treated as though it returns a pair of arbitrary
+real numbers;</p></li>
+<li><p>The expression <span class="math inline">\(\exp{(&lt;= count 0)}\)</span>, evaluated in any environment
+of the same shape as <span class="math inline">\(\env{2}\)</span>, should be treated as though it
+returns an arbitrary boolean;</p></li>
+<li><p>etc.</p></li>
+</ul>
+<p>Moreover, the entries tell us exactly the shapes of program points
+through which execution will pass, so they carry sufficient
+information to generate code that will do the same thing but with
+explicit data types and control flow, which will then be
+optimizable by standard methods.</p>
+<h2 id="code-generation">Code Generation</h2>
+<p>Now that we have a flow analysis in hand, what do we do with it?
+The entries in the analysis cover all the shapes of all the program
+points that will be encountered during program execution. In
+particular, the entries like</p>
+<p><span class="math display">\[ \obj{iterate}, \R, \obj{closure1}, \RR \mapsto \RR \]</span>
+correspond to procedure applications, and cover all the function calls
+(in all the variations on the shapes of their arguments) that will
+occur at runtime.</p>
+<p>We generate a procedure corresponding to each such entry. Since a given
+source procedure may lead to many entries if it is called with arguments of
+many different shapes, this is the place where we materialize the
+specialization that the flow analysis gave us. The body of
+each generated procedure is bascially a direct copy of the body of the
+closure being applied, with three important exceptions:</p>
+<ul>
+<li><p>Any subexpressions whose concrete values are completely determined
+by what is known about the argument shapes get replaced by constants
+(in particular, a lot of the type tests that happen in the source
+language go away at this point).</p></li>
+<li><p>To make sure the result is first-order, the code generator performs
+<a href="http://matt.might.net/articles/closure-conversion/">closure
+conversion</a>;
+that is, every <code>lambda</code> form becomes a constructor for an explicit
+data structure, and every procedure accepts and deconstructs this
+structure to find the variables it was closed over. Note that we
+don’t need to keep track of the code pointer, because the abstract
+evaluation already computed where they flow.</p></li>
+<li><p>Each application in the body becomes a call to the appropriate
+generated procedure. The resulting static control flow information
+is very precise because we always call exactly the specialization
+determined by the shapes of the arguments passed at that particular
+call site.</p></li>
+</ul>
+<p>For example, the entry</p>
+<p><span class="math display">\[ \obj{iterate}, \R, \obj{closure1}, \RR \mapsto \RR \]</span>
+becomes the following code (comments added):<a href="#fn4" class="footnote-ref" id="fnref4" role="doc-noteref"><sup>4</sup></a></p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode scheme"><code class="sourceCode scheme"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>(operation-231  <span class="co">; iterate-R-cl1-R.R would be a better name</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>         the-env        <span class="co">; arg introduced by closure conversion</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>         count f-env x) <span class="co">; original args, but proc now just env</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">;; The intermediate language has explicit type signatures</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  (argument-types</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>   env-226                    <span class="co">; environment data type</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>   real env-235 (real <span class="op">.</span> real) <span class="co">; types of formal parameters</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>   (real <span class="op">.</span> real))             <span class="co">; return type</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">if</span> (operation-234 <span class="co">; application of &lt;= to R and 0</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>       (env-226-g:&lt;= the-env) <span class="co">; the &lt;= procedure is in my closure</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>       count <span class="dv">0</span>)</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>      x</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>      (operation-231 <span class="co">; recursive application (same arg shapes)</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>       the-env       <span class="co">; recursion means same closure</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>       (operation-24 <span class="co">; application of - to R and 1</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>        (env-226-g:- the-env)</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>        count <span class="dv">1</span>)</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>       f-env</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>       (operation-23 <span class="co">; the call (f x) from the source</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>                     <span class="co">; the target is static, and itself specialized</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>        f-env x))))</span></code></pre></div>
+<p>Are we fast yet? No, I expect not. But though this may not be
+apparent by looking at it, this intermediate code is much more
+amenable to optimization by well-known methods than the</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode scheme"><code class="sourceCode scheme"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>(iterate count f x)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">if</span> (<span class="op">&lt;=</span> count <span class="dv">0</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>      x</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>      (iterate (<span class="op">-</span> count <span class="dv">1</span>) f (f x))))</span></code></pre></div>
+<p>we started with. For instance, the minus procedure (spelled <code>-</code>) is not actually
+primitive in DVL, but defined in the standard library as a generic
+procedure that operates on arbitrary “vector-like” structures,
+including trees of dual numbers for <a href="../introduction-to-automatic-differentiation/">automatic
+differentiation</a>.
+But the generated procedure <code>operation-24</code> is specialized to the case
+of applying minus to some real number and the constant 1. With further
+optimization, <code>operation-24</code> will turn into a single machine
+instruction, even though minus was capable of an arbitrarily deep
+recursive computation. But perhaps even more important in this case
+is that the <code>(f x)</code> call from the source, which called a syntactically
+unknown function, now becomes a static call to a known procedure
+(namely, <code>operation-23</code>), which is itself specialized to its calling
+context.</p>
+<blockquote class="pullquote-display">
+<p>
+Flow analysis
+removes obstacles to optimization by detecting which
+parts of the program don’t actually communicate with each other,
+so their interfaces need not remain compatible.
+</p>
+</blockquote>
+<p>Why will this help us be fast later? The primary obstacle to
+optimization is the inability to
+alter interfaces, because to alter an interface one needs to adjust
+all the producers and consumers of that interface. Flow analysis
+reduces this obstacle by detecting which
+parts of the program don’t actually communicate with each other,
+so that their interfaces need not remain compatible.
+The generated FOL program captures this more accurate model of the
+source program’s communication flow, and is consequently very amenable
+to optimization by standard methods.</p>
+<h2 id="further-optimization">Further Optimization</h2>
+<p>Here is not the place to discuss in detail all of the optimization
+passes that operate on intermediate FOL programs. Suffice it to say
+that aggressive application of the following standard techniques
+produces quite pleasant results:</p>
+<dl>
+<dt><a href="https://en.wikipedia.org/wiki/Inline_expansion">Procedure inlining</a></dt>
+<dd>
+<p>inserts (many) definitions of called procedures inline into their
+callers. Inlining is less critical for FOL than for other languages
+because those called procedures are already quite specialized, so
+copying them yields less benefit. Some later optimizations are
+still easier to spot after inlining than before, though.</p>
+</dd>
+<dt><a href="https://en.wikipedia.org/wiki/Common_subexpression_elimination">Common subexpression elimination</a></dt>
+<dd>
+<p>replaces repeated computations by reuses of past results. This
+pass also applies algebraic simplifications like <code>(car (cons x _)) =&gt; x</code> and <code>(* z 0) =&gt; 0</code>.<a href="#fn5" class="footnote-ref" id="fnref5" role="doc-noteref"><sup>5</sup></a> These activities are
+intermeshed in one pass because these optimizations
+cascade with each other.</p>
+</dd>
+</dl>
+<dl>
+<dt><a href="https://en.wikipedia.org/wiki/Dead_code_elimination">Dead code elimination</a></dt>
+<dd>
+<p>deletes computations of values for unused variables. The
+intraprocedural version is simple and effective. The DVL compiler
+also implements an interprocedural version, which is mostly good
+for flushing stuff carried around but not used in recursive loops.</p>
+</dd>
+<dt>Scalar replacement of aggregates</dt>
+<dd>
+<p>converts compound data structures into sets of scalar variables
+when possible, reducing allocation and referencing.</p>
+</dd>
+<dt><a href="https://en.wikipedia.org/wiki/Constant_folding">Constant folding</a></dt>
+<dd>
+<p>is not necessary because the code generator already replaced
+computations of statically known values with those constants.</p>
+</dd>
+</dl>
+<p>In the case of our running example, the result after applying these
+passes is the cleanest iteration for which one could wish:<a href="#fn6" class="footnote-ref" id="fnref6" role="doc-noteref"><sup>6</sup></a></p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode scheme"><code class="sourceCode scheme"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>(<span class="ex">define</span><span class="fu"> </span>(operation-231</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>         count</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>         f-env-1 <span class="co">; The only variable content of the closure</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>         f-env-2 <span class="co">; of f was two real numbers</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>         x-1</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>         x-2)</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  (argument-types</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>   real real real real real</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>   (<span class="kw">values</span> real real)) <span class="co">; Returns two values to avoid making a pair</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  (<span class="kw">if</span> (<span class="op">&lt;=</span> count <span class="dv">0</span>)     <span class="co">; Primitive numeric &lt;= now</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>      (<span class="kw">values</span> x-1 x-2)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>      (operation-231   <span class="co">; Loops still rely on tail recursion</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>       (<span class="op">+</span> count -<span class="dv">1</span>)    <span class="co">; Primitive numeric +</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>       f-env-1</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>       f-env-2</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>       <span class="co">;; Here is our elaborate arithmetic specialized to complex</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>       <span class="co">;; numbers and inlined.  No allocation or generics here;</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a>       <span class="co">;; just floating adds and multiplies.</span></span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>       (<span class="op">+</span> (<span class="op">-</span> (<span class="op">*</span> x-1 x-1) (<span class="op">*</span> x-2 x-2))</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>          f-env-1)</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a>       (<span class="op">+</span> (<span class="op">+</span> (<span class="op">*</span> x-1 x-2) (<span class="op">*</span> x-2 x-1))</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>          f-env-2))))</span></code></pre></div>
+<p>All that remains is to print it out in the backend’s preferred syntax.</p>
+<h2 id="backend-translation">Backend Translation</h2>
+<p>Translation from optimized intermediate code to the syntax of the
+desired backend is not actually completely trivial, because backends
+tend not to have exactly the same semantic model as the intermediate
+language. For example, the asm.js backend implements multiple value
+returns by writing to the global array that serves as heap (I am
+fortunate that I do not need it for anything else right now). That
+said, there isn’t that much enlightening content in backend
+translation as it currently exists in the DVL system. Getting from
+the optimized FOL in the previous section to the following asm.js is
+really pretty straightforward.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="kw">function</span> <span class="fu">operation_231</span>(count<span class="op">,</span> f_env_1<span class="op">,</span> f_env_2<span class="op">,</span> x_1<span class="op">,</span> x_2) {</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  count <span class="op">=</span> <span class="op">+</span>count<span class="op">;</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  f_env_1 <span class="op">=</span> <span class="op">+</span>f_env_1<span class="op">;</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  f_env_2 <span class="op">=</span> <span class="op">+</span>f_env_2<span class="op">;</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  x_1 <span class="op">=</span> <span class="op">+</span>x_1<span class="op">;</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  x_2 <span class="op">=</span> <span class="op">+</span>x_2<span class="op">;</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (count <span class="op">&lt;=</span> <span class="fl">0.0</span>) {</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    heap_view[<span class="dv">0</span>] <span class="op">=</span> x_1<span class="op">;</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    heap_view[<span class="dv">1</span>] <span class="op">=</span> x_2<span class="op">;</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="fu">operation_231</span>(count <span class="op">-</span> <span class="fl">1.0</span><span class="op">,</span> f_env_1<span class="op">,</span> f_env_2<span class="op">,</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>                         ((x_1<span class="op">*</span>x_1 <span class="op">-</span> x_2<span class="op">*</span>x_2) <span class="op">+</span> f_env_1)<span class="op">,</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>                         ((x_1<span class="op">*</span>x_2 <span class="op">+</span> x_2<span class="op">*</span>x_1) <span class="op">+</span> f_env_2))<span class="op">;</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div>
+<p>And that’s it. There you have it, folks: the anatomy of one compiler
+that’s too clever for its own good.</p>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script type="text/javascript">
+MathJax.Hub.Config({
+  TeX: {
+    Macros: {
+      R: "{\\mathbb{R}}",
+      B: "{\\mathbb{B}}",
+      RR: "(\\R\\ . \\R)",
+      eps: "\\varepsilon",
+      exp: ["{\\textrm{#1}}",1],
+      env: ["{\\textrm{env#1}}",1],
+      obj: ["{\\left<\\textrm{#1}\\right>}",1],
+    },
+    equationNumbers: { autoNumber: "AMS" },
+    noErrors: { disabled: true },
+  }
+});
+</script>
+<h2 id="notes">Notes</h2>
+<section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p>For those who know the jargon, I can elaborate a bit.
+The trick in DVL is that the abstract value space is extremely
+fine-grained: the only actual abstraction is over unknown real numbers
+and unknown booleans (general sum types are on the roadmap but not
+implemented yet). In particular, the abstraction of a procedure is a
+closure with a definite code body, and only the contents of the
+environment are abstract. The second trick is that the analysis is
+polyvariant, and indeed there are no built-in bounds on the
+polyvariance—all imprecision is introduced manually. Eschewing
+polyvariance bounds buys a certain predictability, namely the
+generated code being exactly as specialized as the programmer intends.
+The cost this choice pays, of course, is possible overspecialization,
+including possible nontermination of the analysis.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>Actually, DVL includes a primitive nullary procedure named
+<code>gensym</code>, different dynamic invocations of which make distinct
+objects. This little bit of impurity is what puts the Dys- into
+DysVunctional Language. Some impurity is necessary to correctly
+implement <a href="../introduction-to-automatic-differentiation/">automatic
+differentiation</a>, and I
+chose generating unique objects because they can still be accommodated
+within the framework of flow analysis. How to actually accommodate them is
+beyond the scope of this footnote; but the program being described in this
+essay is preserved in the DVL source repository as <a href="https://github.com/axch/dysvunctional-language/tree/master/vl/">Vunctional
+Language (VL)</a>.<a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3"><p>By “shape” I mean that <span class="math inline">\(\env1\)</span> or <span class="math inline">\(\obj{closure1}\)</span> are
+actually abstract, and may, for example, declare some variables bound
+to arbitrary real numbers rather than to specific values, allowing
+variation at those points. Note that in this system, abstract
+procedures like <span class="math inline">\(\obj{closure1}\)</span> still have just one concrete
+procedure body, and admit variation only in the values of closed-over
+variables. This fine granularity is important, because application of an abstract
+procedure means branching to a specific piece of code: all variation
+in control flow caused by higher-order functions is at this point
+solved.<a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn4"><p>Actually, if you look in <a href="https://github.com/axch/dysvunctional-language/blob/master/vl/code-generator.scm">the
+source</a>,
+this output is somewhat simplified from what code generation produces, but
+not in any important way. I have post-processed the output to
+eliminate a few confusing and uninteresting artifacts of the choice of
+minimum primitive basis in the DVL language, and of the details of DVL
+macroexpansion into said minimum primitive basis. In particular,
+recursion is actually handled with a variant of the <a href="https://en.wikipedia.org/wiki/Fixed-point_combinator#Y_combinator">Y
+combinator</a>
+rather than explicit implementation as this example would suggest.
+But that’s beside the point.<a href="#fnref4" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn5"><p>Yes, yes, I know that converting <code>(* z 0)</code> to <code>0</code> does not
+preserve semantics strictly in the presence of floating point
+infinities and NaNs. This optimization is present in the prototype
+because it chains, and because the implementation of automatic
+differentiation in DVL introduces lots of multiplications by
+statically apparent zeroes. In the limit as DVL approaches actual
+production use, thought will need to be directed to the distinction
+between code expressing formulas over nice mathematical structures
+(where multiplying by zero always does produce zero) and code
+carefully written with floating point semantics in mind. This
+actually strikes me as a very deep issue, because it is the difference
+between specification and approximation.<a href="#fnref5" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn6"><p>FOL currently has no explicit syntax for loops and
+represents them as tail recursions. This makes it difficult to
+implement loop optimizations over FOL; but my philosophy is to let the
+compiler targeted by the backend deal with that for now. FOL’s other
+optimizations are quite useful for making sure the code generated from
+FOL doesn’t violate any hidden assumptions of its targets, but
+optimizing loops inside FOL does not seem necessary for that. On the
+other hand, handling loops well may be a good idea if I get serious
+about targeting asm.js, because it may not optimize said loops for me.<a href="#fnref6" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+  </div>
+
+  <footer>
+    <div class="metadata">
+    </div>
+    <div class="nav-back">
+      <a href="../../../" title>← Conversations index</a>
+    </div>
+  </footer>
+</article>
+
+      </div><!-- #content -->
+    </div><!-- #container -->
+
+    <div id="footer">
+    </div><!-- #footer -->
+  </div><!-- #wrapper .hfeed -->
+</body>
+</html>

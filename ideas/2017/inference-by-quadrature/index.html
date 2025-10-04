@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href="https://fonts.googleapis.com/css?family=Merriweather+Sans:800,400italic|Inconsolata:400|Merriweather:400,400italic" rel="stylesheet" type="text/css">
+
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta content="width=device-width" name="viewport">
+  <title>Inference by Quadrature</title>
+
+  
+  <meta name="author" content="Alexey Radul" />
+  
+
+  <link rel="stylesheet" type="text/css" href="../../../css/erudite.css" />
+  <link rel="icon" href="../../../favicon.ico" />
+  <link rel="alternate" type="application/rss+xml" title="Conversations Updates -- RSS" href="../../../feed.xml" />
+  
+</head>
+
+<body>
+
+  <div id="wrapper" class="hfeed">
+    <div id="header-wrap">
+      <div id="header" role="banner">
+        <h1 id="blog-title"><span><a href="../../../" title rel="home">Conversations</a></span></h1>
+        <div id="blog-description"></div>
+      </div><!--  #header -->
+      <div id="access" role="navigation">
+        <div class="skip-link"><a href="#content" title></a></div>
+      </div><!-- #access -->
+    </div><!--  #header-wrap -->
+
+    <div id="container">
+      <div id="content" role="main">
+        <article class="hentry" itemscope itemtype="http://schema.org/BlogPosting">
+  
+  <header>
+    <h2 class="entry-title" itemprop="name">Inference <em>by</em> Quadrature</h2>
+  </header>
+
+  <div class="entry-meta">
+
+    <span class="entry-date">
+      <abbr class="published">December 25, 2017</abbr>
+    </span>
+    <span class="author vcard">
+      By Alexey Radul
+    </span>
+  </div>
+
+  <div class="entry-content" itemprop="articleBody">
+    <p>Production-level probabilistic inference is usually said to be about
+very high-dimensional problems. The usual argument for the
+techniques one learns (importance sampling, Markov chain Monte Carlo,
+etc) starts from the curse of
+dimensionality—that classic quadrature is hopelessly inefficient in
+many (i.e., more than four) dimensions. But what if one wants
+probability in a low-dimensional problem? For example, one
+might have a low-dimensional sub-problem of a more complex problem, or
+one might want to test a scalable sampling technique on a low-d
+version of some problem of interest. How can quadrature be useful?</p>
+<p>One way to use quadrature is to explicitly compute the normalization
+constant of an unnormalized probability density. Then, up to the
+numerical error in the quadrature, one has the <em>normalized</em> density
+function, with which one can proceed to do whatever one wants.</p>
+<p>Another way to use the same sort of grid of evaluations of the
+un-normalized density is the technique called “Griddy Gibbs”.
+Griddy Gibbs is applicable when the density of interest is <span class="math inline">\(p(x) = Z \tilde
+p(x)\)</span>, where <span class="math inline">\(Z\)</span> is unknown but independent of <span class="math inline">\(x\)</span>, and <span class="math inline">\(\tilde p(x)\)</span>
+is computationally tractable. One needs, furthermore, that</p>
+<ul>
+<li><span class="math inline">\(X\)</span> is one-dimensional;<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a></li>
+<li>one wants to sample from an approximation to <span class="math inline">\(p(x)\)</span>; and</li>
+<li>one can afford to evaluate <span class="math inline">\(\tilde p(x)\)</span> a fair number of times, say 100.</li>
+</ul>
+<p>When might this happen? The general lore is that if one’s entire
+problem were one-dimensional, one would not need samples.
+Nonetheless, I can imagine at least two uses for high-quality
+one-dimensional sampling methods: testing, and participating in a
+larger Gibbs-style sampler.</p>
+<p>I have seen the latter arise in hierarchical Bayes quite often.
+Generally, a hierarchical Bayesian model often factors as <span class="math inline">\(p(D|\theta)
+p(\theta|z) p(z)\)</span>, where <span class="math inline">\(D\)</span> are the data, <span class="math inline">\(\theta\)</span> are some latent
+parameters of immediate interest (like the means of some clusters one
+is trying to infer) and <span class="math inline">\(z\)</span> are some deeper latent parameters, like
+the concentration parameter of one’s prior on the number of clusters.
+If, as happens all too often, there aren’t enough conjugacies to
+elimiate <span class="math inline">\(z\)</span> or <span class="math inline">\(\theta\)</span>, one many choose a Gibbs-style sampler for
+the overall problem, alternating sampling <span class="math inline">\(\theta_{t+1} \sim
+p(\theta|D, z_t)\)</span> and <span class="math inline">\(z_{t+1} \sim p(z|\theta_{t+1})\)</span>.<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a>
+This kind of case fits Griddy Gibbs very well: I have
+often seen the distribution <span class="math inline">\(p(z|\theta)\)</span> factor completely into
+one-dimensional parts that can be sampled independently. Furthermore,
+<span class="math inline">\(\theta\)</span> is often much smaller than <span class="math inline">\(D\)</span>, so the <span class="math inline">\(\theta_{t+1} \sim
+p(\theta|D, z_t)\)</span> steps dominate the overall computation, and
+therefore one can afford to evaluate <span class="math inline">\(\tilde p(z|\theta)\)</span> many times in each
+<span class="math inline">\(z_{t+1} \sim p(z|\theta_{t+1})\)</span> step to get a good <span class="math inline">\(z_{t+1}\)</span>. Since
+these models can be quite sensitive to the <span class="math inline">\(z\)</span> parameters, the
+investment can pay off handsomely. For example, every sampler I know
+of for the <a href="http://jmlr.org/papers/v17/11-392.html">CrossCat</a> model
+uses some variant of Griddy Gibbs for the hyperparameters.</p>
+<p>So, how does one actually do Griddy Gibbs? The way I learned it was
+this:</p>
+<ol type="1">
+<li><p>Evaluate <span class="math inline">\(\tilde p(x)\)</span> at some grid of points <span class="math inline">\(x_i\)</span>.</p></li>
+<li><p>Compute the normalization constant <span class="math inline">\(\hat Z = \sum \tilde p(x_i)\)</span>.</p></li>
+<li><p>Approximate <span class="math inline">\(p(x)\)</span> as a categorical distribution on that grid,
+<span class="math inline">\(p(x) \approx \frac{1}{\hat Z} \sum \tilde p(x_i) \delta_{x_i}(x)\)</span>.</p></li>
+<li><p>Sample from that.</p></li>
+</ol>
+<p>This has always felt unsatisfying to me. For instance, this
+approxmation never admits an off-grid value for <span class="math inline">\(x\)</span>. Surely, I
+thought, one can do better. So I finally read the original Ritter and
+Tanner 1991 techreport,<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a> and found that Mssrs Ritter and
+Tanner indeed suggested doing better: they argue in the paper that any
+quadrature technique of one’s choosing can form a legitimate
+approximation to <span class="math inline">\(p(x)\)</span> from a grid of evaluations of <span class="math inline">\(\tilde p(x)\)</span>,
+wherefrom one can then sample.</p>
+<p>Here’s one such algorithm, with a piecewise linear
+rather than piecewise constant approximation to the CDF of <span class="math inline">\(p(x)\)</span>:</p>
+<ol type="1">
+<li><p>Evaluate <span class="math inline">\(\tilde p(x)\)</span> at some ordered grid of points <span class="math inline">\(x_0 &lt; x_1 &lt; \ldots &lt; x_i &lt; \ldots &lt; x_n\)</span>.</p></li>
+<li><p>Compute <span class="math inline">\(\hat Z = \sum_{i=0}^{n-1} \tilde p(x_i) (x_{i+1} - x_i)\)</span>.</p></li>
+<li><p>Approximate <span class="math inline">\(p(x)\)</span> as the piecewise constant PDF
+<span class="math display">\[ p(x) \approx \hat p(x) = \begin{cases} 0 &amp; x &lt; x_0 \\ \frac{\tilde p(x_i)}{Z} &amp; x_i \leq x &lt; x_{i+1} \\ 0 &amp; x \geq x_n \end{cases} \]</span>
+(whose CDF is therefore piecewise linear).</p></li>
+<li><p>Sample from that.</p></li>
+</ol>
+<p>This looks a lot better. One reason I suspect it may not have caught
+on as much is that there are several free choices embedded in what I
+presented, leaving more work for the practitioner who wishes to adopt
+it. For instance, instead of using the value of <span class="math inline">\(\tilde p\)</span> at the
+lower end point of the interval <span class="math inline">\((x_i, x_{i+1})\)</span>, one can use the
+average: <span class="math inline">\(\hat p(x) = (\tilde p(x_i) + \tilde p(x_{i+1})) / 2 \hat Z'\)</span>
+(which <span class="math inline">\(\hat Z'\)</span> needs to be computed accordingly, and is not equal to
+<span class="math inline">\(\hat Z\)</span>). Also, instead of setting the mass outside <span class="math inline">\((x_0, x_n)\)</span> to
+<span class="math inline">\(0\)</span> as I have done, one can posit some tails of some functional form
+with total mass <span class="math inline">\(\varepsilon\)</span> (which becomes a parameter of the
+method) and scale the rest of the PDF accordingly. One can alternately deal
+with infinite support by using some change of variable formula to do
+the quadrature over a finite interval. In the context of defining a
+general library or programming language for inference, I think the
+gain is worth the cost, but I can see why a practitioner writing a
+one-off inference scheme may decide to avoid this choice space.</p>
+<p>I want to point out one more possible adjustment.<a href="#fn4" class="footnote-ref" id="fnref4" role="doc-noteref"><sup>4</sup></a> As I learned Griddy
+Gibbs, one performs inference by sampling directly from the computed
+<span class="math inline">\(\hat p(x)\)</span>, accepting the difference between it and the target <span class="math inline">\(p(x)\)</span>
+as error in one’s ultimate solution. However, if one is trying to set
+up a convergent Markov chain, one can also treat <span class="math inline">\(\hat p(x)\)</span> as a
+Metropolis-Hastings proposal distribution, and guarantee convergence
+to the right target by accepting or rejecting it. Such a step looks
+like</p>
+<ol type="1">
+<li><p>As above.</p></li>
+<li><p>As above.</p></li>
+<li><p>As above.</p></li>
+<li><p>Propose to move to <span class="math inline">\(x_{t+1} \sim \hat p(x)\)</span>.</p></li>
+<li><p>Compute the acceptance ratio<a href="#fn5" class="footnote-ref" id="fnref5" role="doc-noteref"><sup>5</sup></a>
+<span class="math display">\[ \alpha = \frac{\tilde p(x_{t+1}) \hat p(x_t)}{\tilde p(x_t) \hat p(x_{t+1})}. \]</span></p></li>
+<li><p>Move to <span class="math inline">\(x_{t+1}\)</span> with probability <span class="math inline">\(\max(1, \alpha)\)</span>, otherwise stay at <span class="math inline">\(x_t\)</span>.</p></li>
+</ol>
+<p>Here we have gained (as one always does with Metropolis-Hastings)
+accuracy in the limiting distribution in exchange for the speed of
+reaching it. Indeed, if the approximation <span class="math inline">\(\hat p(x)\)</span> is good
+everywhere, then each term <span class="math inline">\(\hat p(x_t) / \tilde p(x_t)\)</span> will be close
+to <span class="math inline">\(1\)</span>, and this chain will almost always accept. However, if the
+approximation is off somewhere, that will show up as rejections.</p>
+<p>As a further refinement, a practitioner could monitor the rejection
+rate in order to assess how good of an approximation they got out of
+their quadrature technique. I can even imagine automatically adapting
+the fineness of the grid, say, to maintain a target acceptance rate as
+a chain proceeds.</p>
+<p>A benefit, as far as I can tell, of embedding Griddy Gibbs in
+Metropolis-Hastings is that the usual problems of trying to develop a
+generic numerical quadrature method get masked by the accept/reject
+step. For instance, suppose <span class="math inline">\(\tilde p(x)\)</span> has a pole inside the
+domain of integration. Then any approximation <span class="math inline">\(\hat p(x)\)</span> must cut
+off substantial mass, due to finite resolution near the pole.<a href="#fn6" class="footnote-ref" id="fnref6" role="doc-noteref"><sup>6</sup></a>
+Evaluated as quadrature, this leads to potentially unacceptable error
+in the answers. But evaluated as a proposal distribution, this just
+leads to a slowdown in convergence—the chain will fix the
+underapproximation of the pole by tending to reject moves away from
+it. The same thing happens if the approximation’s tails are too thin
+(as long as they are non-zero). The accept/reject step provides
+an automatic mis-fit detection mechiansm.</p>
+<p>In summary, I think quadrature is a very useful tool in the
+inferential kit, and I’m sad that I didn’t get a chance to <a href="https://github.com/probcomp/Venturecxx/issues/642">implement
+it in Venture</a>.</p>
+<h2 id="references">References</h2>
+<ul>
+<li><p>Ritter, C. &amp; Tanner, M., “The Griddy Gibbs sampler”, 1991,
+Technical Report #878, Department of Statistics, University of Wisconsin-Madison
+<a href="https://www.stat.wisc.edu/sites/default/files/tr878_0.pdf">https://www.stat.wisc.edu/sites/default/files/tr878_0.pdf</a></p></li>
+<li><p>Ritter, C. &amp; Tanner, M., “Facilitating the Gibbs Sampler: The Gibbs
+Stopper and the Griddy-Gibbs Sampler”, 1992, Journal of the American
+Statistical Association (87) pp. 861-868</p></li>
+</ul>
+<h2 id="notes">Notes</h2>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+<script type="text/javascript">
+MathJax.Hub.Config({
+  TeX: {
+    equationNumbers: { autoNumber: "AMS" },
+    noErrors: { disabled: true },
+  }
+});
+</script>
+<section id="footnotes" class="footnotes footnotes-end-of-document" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1"><p>The idea generalizes to any dimensionality, of course. It
+is even plausibly useful in up to three or four, but I want to present
+in 1-D for simplicity.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2"><p>Both samples may be approximate. As long as the transition operators
+<span class="math inline">\(T_{z_t}(\theta_{t+1}|\theta_t)\)</span> and <span class="math inline">\(T_{\theta_{t+1}}(z_{t+1}|z_t)\)</span>
+are ergodic and have the stationary distributions <span class="math inline">\(p(\theta|D, z_t)\)</span>
+and <span class="math inline">\(p(z|\theta_{t+1})\)</span>, respectively, the overall chain will converge
+to <span class="math inline">\(p(\theta, z|D)\)</span> as <span class="math inline">\(t \to \infty\)</span>.<a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3"><p>The published version, Ritter and Tanner 1992,
+does not appear to be open access.<a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn4"><p>I have not seen this refinement in the literature, but that’s probably
+because I didn’t look hard enough.<a href="#fnref4" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn5"><p>As written, <span class="math inline">\(\alpha\)</span> is correct if the choice of grid
+<span class="math inline">\(x_i\)</span> does not depend on the current state <span class="math inline">\(x_t\)</span>. If <span class="math inline">\(x_i\)</span> does
+depend on <span class="math inline">\(x_t\)</span>, computing the reverse probability calls for repeating
+the quadrature on the grid points <span class="math inline">\(x_{t+1}\)</span> determines. This is fine—one gives up 2x
+in affordable grid resolution in exchange for adapting the grid to the areas the
+chain wants to explore. For instance, doing a pair of
+<a href="https://en.wikipedia.org/wiki/Tanh-sinh_quadrature">tanh-sinh</a>
+integrations over <span class="math inline">\((-\infty, x_t)\)</span> and <span class="math inline">\((x_t, \infty)\)</span> would be a way to
+focus a lot of computational attention near the current point, which should
+be good for exploring a tall peak (once the chain found it).<a href="#fnref5" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn6"><p>Unless, of course, the operator knows where the pole is
+and deploys appropriate tactics to tame it, but that can only
+work on a case-by-case basis.<a href="#fnref6" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+  </div>
+
+  <footer>
+    <div class="metadata">
+    </div>
+    <div class="nav-back">
+      <a href="../../../" title>← Conversations index</a>
+    </div>
+  </footer>
+</article>
+
+      </div><!-- #content -->
+    </div><!-- #container -->
+
+    <div id="footer">
+    </div><!-- #footer -->
+  </div><!-- #wrapper .hfeed -->
+</body>
+</html>
