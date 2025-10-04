@@ -14,6 +14,7 @@ import Data.List (sortBy)
 import Data.Ord (Down(..), comparing)
 import Data.Time (UTCTime, defaultTimeLocale)
 import Data.Time.Format (parseTimeM)
+import System.FilePath (takeBaseName)
 
 import Hakyll hiding (renderPandoc)
 import Lucid (renderText)
@@ -109,7 +110,17 @@ rules mode = do
         >>= loadAndApplyTemplate "templates/default.html" ctx
         >>= relativizeUrls
 
-  -- 6) RSS feed of recent posts (exclude drafts in Production)
+  -- 6) Error pages (403 and 404) - GitHub Pages expects them at root
+  match "error/*.html.md" $ do
+    route $ customRoute $ \ident ->
+      let base = takeBaseName $ takeBaseName $ toFilePath ident
+      in base ++ ".html"
+    compile $ getResourceBody
+      >>= renderPandoc
+      >>= loadAndApplyTemplate "templates/default.html" siteCtx
+      >>= relativizeUrls
+
+  -- 7) RSS feed of recent posts (exclude drafts in Production)
   create ["feed.xml"] $ do
     route idRoute
     compile $ do
