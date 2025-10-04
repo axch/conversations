@@ -48,6 +48,9 @@ jobs:
           # Optional: if your generator needs locale for UTF-8 paths
           LANG: en_US.UTF-8
 
+      - name: Suppress Jekyll
+        run: touch _site/.nojekyll
+
       # If you need a CNAME, copy it into _site/ before this step.
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
